@@ -13,6 +13,7 @@ import '../attendance/attendance_page.dart';
 import '../leave/employee/leave_page.dart';
 import '../leave/approver/leave_management_page.dart';
 import '../../services/secure_storage_service.dart';
+import '../payroll/salary_page.dart';
 
 // ---- Design tokens ----
 const kBluePrimary = Color(0xFF1B5FE0);
@@ -760,7 +761,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
       (
       icon: Icons.account_balance_wallet_outlined,
       label: 'Payroll',
-      onTap: () {},
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const SalaryPage(),
+          ),
+        );
+      },
       ),
       (
       icon: Icons.campaign_outlined,

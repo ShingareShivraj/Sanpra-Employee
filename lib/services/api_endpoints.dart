@@ -212,4 +212,22 @@ class ApiEndpoints {
   static const String rejectLeaveApplication =
       "$leaveApi.reject_leave_application";
 
+
+//   salary
+
+  static const String payrollApi =
+      "$baseUrl/api/method/geo_attendance.payroll";
+
+  static const String mySalarySummary =
+      "$payrollApi.get_my_salary_summary";
+
+  static const String mySalarySlips =
+      "$payrollApi.get_my_salary_slips";
+
+  static const String mySalarySlip =
+      "$payrollApi.get_my_salary_slip";
+
+  static const String downloadMySalarySlip =
+      "$payrollApi.download_my_salary_slip";
+
 }
