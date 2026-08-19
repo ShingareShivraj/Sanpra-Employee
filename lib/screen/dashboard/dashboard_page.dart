@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../chat/chat_screen.dart';
+import '../chat/manager/chat_manager_screen.dart';
+import '../chat/manager/group_info_screen.dart';
 import '../issues/company_issues_screen.dart';
 import '../issues/issue_screen.dart';
 import '../login/login_page.dart';
+import '../performance/performance_screen.dart';
 import '../tasks/employee/my_tasks_screen.dart';
 import '../tasks/employee/task_details_screen.dart';
 import '../tasks/manager/task_dashboard_screen.dart';
@@ -770,21 +774,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       },
       ),
-      (
-      icon: Icons.campaign_outlined,
-      label: 'Notice Board',
-      onTap: () {},
-      ),
+      // (
+      // icon: Icons.campaign_outlined,
+      // label: 'Notice Board',
+      // onTap: () {},
+      // ),
       (
       icon: Icons.bar_chart_rounded,
       label: 'Reports',
-      onTap: () {},
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const PerformanceScreen(),
+          ),
+        );
+      },
       ),
       (
       icon: Icons.chat_bubble_outline_rounded,
       label: 'Chat',
-      onTap: () {},
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              onOpenManager: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ChatManagerScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
       ),
+
+
       (
       icon: Icons.person_outline_rounded,
       label: 'Profile',

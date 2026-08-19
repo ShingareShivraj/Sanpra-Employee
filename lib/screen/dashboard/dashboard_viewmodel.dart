@@ -33,7 +33,7 @@ class DashboardViewModel extends ChangeNotifier {
   // ============================================================
 // TASK PERMISSIONS
 // ============================================================
-
+  bool isChatManager = false;
   bool isTaskManager = false;
 
   bool canCreateTask = false;
@@ -97,6 +97,8 @@ class DashboardViewModel extends ChangeNotifier {
       // ============================================================
 // TASK PERMISSIONS
 // ============================================================
+      isChatManager =
+      await _authService.hasRole("Chat Manager");
 
       isTaskManager =
       await _authService.getIsTaskManager();

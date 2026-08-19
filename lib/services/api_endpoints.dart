@@ -230,4 +230,71 @@ class ApiEndpoints {
   static const String downloadMySalarySlip =
       "$payrollApi.download_my_salary_slip";
 
+
+  //chatting
+
+  static const String chatApi =
+      "$baseUrl/api/method/geo_attendance.chat";
+
+  static const String chatAccess =
+      "$chatApi.get_chat_access";
+
+  static const String chatEmployees =
+      "$chatApi.get_available_employees";
+
+  static const String myChatGroups =
+      "$chatApi.get_my_groups";
+
+  static const String chatGroupDetails =
+      "$chatApi.get_group_details";
+
+  static const String chatMessages =
+      "$chatApi.get_messages";
+
+  static const String sendChatMessage =
+      "$chatApi.send_message";
+
+  static const String markChatGroupRead =
+      "$chatApi.mark_group_read";
+
+  static const String deleteChatMessage =
+      "$chatApi.delete_message";
+
+  static const String createChatGroup =
+      "$chatApi.create_group";
+
+  static const String updateChatGroup =
+      "$chatApi.update_group";
+
+  static const String addChatMembers =
+      "$chatApi.add_members";
+
+  static const String removeChatMember =
+      "$chatApi.remove_member";
+
+  static const String updateChatMemberPermission =
+      "$chatApi.update_member_permission";
+
+  static const String uploadFile =
+      "$baseUrl/api/method/upload_file";
+
+//   performance
+  static const String performanceApi =
+      "$baseUrl/api/method/geo_attendance.report";
+
+  static const String performanceAccess =
+      "$performanceApi.get_performance_access";
+
+  static const String myMonthlyPerformance =
+      "$performanceApi.get_my_monthly_performance";
+
+  static const String monthlyPerformance =
+      "$performanceApi.get_monthly_performance";
+
+  static const String employeesMonthlyPerformance =
+      "$performanceApi.get_employees_monthly_performance";
+
+  static const String performanceDepartments =
+      "$performanceApi.get_performance_departments";
+
 }

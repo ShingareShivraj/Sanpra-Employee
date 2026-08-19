@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import 'api_endpoints.dart';
 import 'secure_storage_service.dart';
 
 class ApiService {
@@ -94,6 +95,34 @@ class ApiService {
         contentType:
         Headers.multipartFormDataContentType,
       ),
+    );
+  }
+
+
+  Future<void> download({
+    required String url,
+    required String savePath,
+  }) async {
+    final parsedUri = Uri.parse(url);
+
+    final String downloadUrl;
+
+    if (parsedUri.hasScheme) {
+      // Full URL already provided.
+      downloadUrl = url;
+    } else {
+      // ERPNext returns relative paths such as:
+      // /private/files/Collage%20Image.png
+      downloadUrl = Uri.parse(ApiEndpoints.baseUrl)
+          .resolve(url)
+          .toString();
+    }
+
+    print('DOWNLOAD URL: $downloadUrl');
+
+    await dio.download(
+      downloadUrl,
+      savePath,
     );
   }
 
