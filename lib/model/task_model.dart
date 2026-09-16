@@ -25,6 +25,7 @@ class TaskModel {
   final String? reviewedBy;
   final String? reviewRemarks;
   final String? owner;
+  final String? ownerName;
   final DateTime? creation;
   final DateTime? modified;
   final bool canStart;
@@ -59,6 +60,7 @@ class TaskModel {
     this.reviewedBy,
     this.reviewRemarks,
     this.owner,
+    this.ownerName,
     this.creation,
     this.modified,
     this.canStart = false,
@@ -106,6 +108,7 @@ class TaskModel {
     reviewRemarks:
     _nullableText(json['review_remarks'] ?? json['custom_review_remarks']),
     owner: _nullableText(json['owner']),
+    ownerName: _nullableText(json['owner_name']),
     creation: _date(json['creation']),
     modified: _date(json['modified']),
     canStart: _boolean(json["can_start"]),
@@ -158,6 +161,86 @@ class TaskModel {
     "can_review": canReview,
     "review_time": reviewTime?.toIso8601String(),
   };
+}
+
+
+class ProjectModel {
+  final String name;
+  final String? projectName;
+  final String? status;
+  final String? priority;
+  final DateTime? expectedStartDate;
+  final DateTime? expectedEndDate;
+  final double? percentComplete;
+  final String? company;
+
+  const ProjectModel({
+    required this.name,
+    this.projectName,
+    this.status,
+    this.priority,
+    this.expectedStartDate,
+    this.expectedEndDate,
+    this.percentComplete,
+    this.company,
+  });
+
+  factory ProjectModel.fromJson(Map<String, dynamic> json) {
+    return ProjectModel(
+      name: _text(json['name']),
+      projectName: _nullableText(json['project_name']),
+      status: _nullableText(json['status']),
+      priority: _nullableText(json['priority']),
+      expectedStartDate: _date(json['expected_start_date']),
+      expectedEndDate: _date(json['expected_end_date']),
+      percentComplete: _double(json['percent_complete']),
+      company: _nullableText(json['company']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'project_name': projectName,
+    'status': status,
+    'priority': priority,
+    'expected_start_date': _dateText(expectedStartDate),
+    'expected_end_date': _dateText(expectedEndDate),
+    'percent_complete': percentComplete,
+    'company': company,
+  };
+}
+
+
+class CompanyProjectsResponseModel {
+  final bool success;
+  final String message;
+  final String? company;
+  final int projectCount;
+  final List<ProjectModel> projects;
+
+  const CompanyProjectsResponseModel({
+    required this.success,
+    this.message = '',
+    this.company,
+    this.projectCount = 0,
+    this.projects = const [],
+  });
+
+  factory CompanyProjectsResponseModel.fromJson(
+      Map<String, dynamic> json,
+      ) {
+    final data = unwrapFrappeResponse(json);
+
+    return CompanyProjectsResponseModel(
+      success: _boolean(data['success']),
+      message: _text(data['message']),
+      company: _nullableText(data['company']),
+      projectCount: _integer(data['project_count']),
+      projects: _list(data['projects'])
+          .map((item) => ProjectModel.fromJson(_json(item)))
+          .toList(),
+    );
+  }
 }
 
 class TaskAssigneeModel {

@@ -1,12 +1,15 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 
 import '../model/dashboard_task_model.dart';
 import '../model/task_detail_model.dart';
 import '../model/task_model.dart';
 import 'api_endpoints.dart';
 import 'api_service.dart';
+
 
 /// Employee-facing task APIs.
 class TaskService {
@@ -68,6 +71,76 @@ class TaskService {
       return _taskFromAction(response.data, 'Unable to start task.');
     } on DioException catch (error) {
       throw Exception(_dioMessage(error, 'Unable to start task.'));
+    }
+  }
+
+  Future<String> uploadTaskProof({
+    required String taskName,
+    required String localPath,
+  }) async {
+    _requireText(taskName, 'Task name is required.');
+    _requireText(localPath, 'Proof file is required.');
+
+    try {
+      final fileName = path.basename(localPath);
+
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          localPath,
+          filename: fileName,
+        ),
+        'is_private': 1,
+        'doctype': 'Task',
+        'docname': taskName.trim(),
+        'fieldname': 'custom_completion_photo',
+      });
+
+      final response = await _api.postMultipart(
+        url: ApiEndpoints.uploadFile,
+        data: formData,
+      );
+
+      final data = _messageMap(response.data);
+      final fileUrl = data['file_url']?.toString().trim() ?? '';
+
+      if (fileUrl.isEmpty) {
+        throw Exception('Server did not return the uploaded file URL.');
+      }
+
+      return fileUrl;
+    } on DioException catch (error) {
+      throw Exception(
+        _dioMessage(error, 'Unable to upload proof file.'),
+      );
+    }
+  }
+
+  Future<String> downloadTaskProof(String fileUrl) async {
+    _requireText(fileUrl, 'Proof file URL is required.');
+
+    try {
+      final uri = Uri.parse(fileUrl);
+      var fileName = uri.pathSegments.isNotEmpty
+          ? uri.pathSegments.last
+          : 'task-proof';
+
+      if (fileName.trim().isEmpty) {
+        fileName = 'task-proof';
+      }
+
+      final directory = await getTemporaryDirectory();
+      final savePath = path.join(directory.path, fileName);
+
+      await _api.download(
+        url: fileUrl,
+        savePath: savePath,
+      );
+
+      return savePath;
+    } on DioException catch (error) {
+      throw Exception(
+        _dioMessage(error, 'Unable to download proof file.'),
+      );
     }
   }
 

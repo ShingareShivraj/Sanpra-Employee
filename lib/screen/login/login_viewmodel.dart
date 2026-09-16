@@ -29,6 +29,13 @@ class LoginViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void fillDemoCredentials() {
+    usernameController.text = "demo@sanpra.com";
+    passwordController.text = "Demo@123";
+
+    notifyListeners();
+  }
+
   Future<LoginResponseModel> login() async {
     if (!formKey.currentState!.validate()) {
       throw Exception("Invalid Form");

@@ -87,6 +87,58 @@ class AttendanceService {
     }
   }
 
+  Future<ShiftInfoModel> getMyShiftInfo() async {
+    try {
+      final Response response = await _apiService.post(
+        url: ApiEndpoints.myShiftInfo,
+        data: {},
+      );
+
+      final responseData = response.data;
+
+      if (responseData == null) {
+        throw Exception(
+          'Empty response from shift info API',
+        );
+      }
+
+      final dynamic message = responseData['message'];
+
+      if (message == null) {
+        throw Exception(
+          'Invalid shift info API response',
+        );
+      }
+
+      if (message is! Map<String, dynamic>) {
+        throw Exception(
+          'Invalid shift information received',
+        );
+      }
+
+      final shiftData = ShiftInfoModel.fromJson(message);
+
+      if (!shiftData.success) {
+        throw Exception(
+          'Unable to load shift information',
+        );
+      }
+
+      return shiftData;
+    } on DioException catch (e) {
+      throw Exception(
+        _getDioErrorMessage(e),
+      );
+    } catch (e) {
+      throw Exception(
+        e.toString().replaceFirst(
+          'Exception: ',
+          '',
+        ),
+      );
+    }
+  }
+
   // ============================================================
   // Dio Error Handling
   // ============================================================

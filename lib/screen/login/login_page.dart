@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../dashboard/dashboard_page.dart';
 import 'login_viewmodel.dart';
+import 'forgot_password_page.dart';
 
 const kBluePrimary = Color(0xFF1B5FE0);
 const kBlueAccent = Color(0xFF4E8CFF);
@@ -202,7 +203,35 @@ class _LoginScreenState extends State<LoginScreen> {
                                   return null;
                                 },
                               ),
-                              const SizedBox(height: 28),
+                              const SizedBox(height: 10),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: GestureDetector(
+                                  onTap: vm.loading
+                                      ? null
+                                      : () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                        const ForgotPasswordScreen(),
+                                      ),
+                                    );
+                                  },
+                                  child: Text(
+                                    'Forgot Password?',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: vm.loading
+                                          ? Colors.grey.shade400
+                                          : kBluePrimary,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              const SizedBox(height: 18),
                               SizedBox(
                                 width: double.infinity,
                                 height: 52,
@@ -231,6 +260,43 @@ class _LoginScreenState extends State<LoginScreen> {
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+
+
+                              ),
+
+                              const SizedBox(height: 14),
+
+                              SizedBox(
+                                width: double.infinity,
+                                height: 48,
+                                child: OutlinedButton.icon(
+                                  onPressed: vm.loading
+                                      ? null
+                                      : () async {
+                                    vm.fillDemoCredentials();
+                                    await _handleLogin();
+                                  },
+                                  icon: const Icon(
+                                    Icons.play_circle_outline_rounded,
+                                    size: 20,
+                                  ),
+                                  label: const Text(
+                                    "GET DEMO ACCOUNT",
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: kBluePrimary,
+                                    side: const BorderSide(
+                                      color: kBluePrimary,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                 ),

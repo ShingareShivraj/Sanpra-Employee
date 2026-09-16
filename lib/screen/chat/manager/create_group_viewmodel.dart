@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -19,6 +20,7 @@ class CreateGroupViewModel extends ChangeNotifier {
   bool _creating = false;
   String _searchQuery = '';
   String? _error;
+  File? _groupImage;
 
   List<ChatEmployeeModel> get employees => List.unmodifiable(_employees);
   bool get loading => _loading;
@@ -27,6 +29,18 @@ class CreateGroupViewModel extends ChangeNotifier {
   String? get error => _error;
   int get selectedCount => _selected.length;
   bool get hasSelection => _selected.isNotEmpty;
+  File? get groupImage => _groupImage;
+
+  void setGroupImage(File? image) {
+    _groupImage = image;
+    notifyListeners();
+  }
+
+  void clearGroupImage() {
+    if (_groupImage == null) return;
+    _groupImage = null;
+    notifyListeners();
+  }
 
   Future<void> initialise() async {
     if (_loading) return;
@@ -104,6 +118,7 @@ class CreateGroupViewModel extends ChangeNotifier {
   Future<ChatGroupDetailsModel?> create({
     required String groupName,
     String? description,
+    File? groupImage,
   }) async {
     if (_creating) return null;
     if (groupName.trim().isEmpty) {
@@ -123,6 +138,7 @@ class CreateGroupViewModel extends ChangeNotifier {
       return await _service.createGroup(
         groupName: groupName.trim(),
         description: description?.trim(),
+        groupImage: groupImage ?? _groupImage,
         members: _selected.entries
             .map((entry) => ChatMemberInput(employee: entry.key, canSend: entry.value))
             .toList(growable: false),

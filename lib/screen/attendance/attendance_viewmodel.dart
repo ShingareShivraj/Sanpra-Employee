@@ -16,10 +16,13 @@ class AttendanceViewModel extends ChangeNotifier {
   // ============================================================
 
   AttendanceCalendarModel? _attendanceData;
+  ShiftInfoModel? _shiftData;
 
   bool _isLoading = false;
+  bool _isShiftLoading = false;
 
   String? _errorMessage;
+  String? _shiftErrorMessage;
 
   // ============================================================
   // Getters
@@ -33,6 +36,15 @@ class AttendanceViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   bool get hasData => _attendanceData != null;
+
+  ShiftInfoModel? get shiftData => _shiftData;
+
+  bool get isShiftLoading => _isShiftLoading;
+
+  String? get shiftErrorMessage => _shiftErrorMessage;
+
+  bool get hasShiftData =>
+      _shiftData?.shift != null;
 
   // ============================================================
   // Load Attendance
@@ -64,6 +76,22 @@ class AttendanceViewModel extends ChangeNotifier {
     }
   }
 
+  Future<void> loadShiftInfo() async {
+    _isShiftLoading = true;
+    _shiftErrorMessage = null;
+
+    notifyListeners();
+
+    try {
+      _shiftData = await _attendanceService.getMyShiftInfo();
+    } catch (e) {
+      _shiftErrorMessage = _cleanErrorMessage(e);
+    } finally {
+      _isShiftLoading = false;
+      notifyListeners();
+    }
+  }
+
   // ============================================================
   // Refresh Attendance
   // ============================================================
@@ -76,6 +104,10 @@ class AttendanceViewModel extends ChangeNotifier {
       fromDate: fromDate,
       toDate: toDate,
     );
+  }
+
+  Future<void> refreshShiftInfo() async {
+    await loadShiftInfo();
   }
 
   // ============================================================
@@ -94,7 +126,9 @@ class AttendanceViewModel extends ChangeNotifier {
 
   void clearData() {
     _attendanceData = null;
+    _shiftData = null;
     _errorMessage = null;
+    _shiftErrorMessage = null;
 
     notifyListeners();
   }
@@ -121,6 +155,16 @@ class AttendanceViewModel extends ChangeNotifier {
 
   String? getHolidayNameForDate(String date) {
     return _attendanceData?.getHolidayName(date);
+  }
+
+  AttendanceDetail? getAttendanceDetailForDate(String date) {
+    return _attendanceData?.getAttendanceDetail(date);
+  }
+  bool isLateMarkForDate(String date) {
+    return _attendanceData
+        ?.getAttendanceDetail(date)
+        ?.lateEntry ??
+        false;
   }
 
   bool isHoliday(String date) {

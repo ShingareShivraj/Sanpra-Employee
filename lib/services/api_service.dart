@@ -20,23 +20,30 @@ class ApiService {
     );
 
     // Automatically attach Authorization Header
+    // Automatically attach Authorization Header
+// unless the request explicitly says it does not require auth.
     dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) async {
 
-          final apiKey =
-          await SecureStorageService.instance.getApiKey();
+          final bool requiresAuth =
+              options.extra["requiresAuth"] ?? true;
 
-          final apiSecret =
-          await SecureStorageService.instance.getApiSecret();
+          if (requiresAuth) {
+            final apiKey =
+            await SecureStorageService.instance.getApiKey();
 
-          if (apiKey != null &&
-              apiSecret != null &&
-              apiKey.isNotEmpty &&
-              apiSecret.isNotEmpty) {
+            final apiSecret =
+            await SecureStorageService.instance.getApiSecret();
 
-            options.headers["Authorization"] =
-            "token $apiKey:$apiSecret";
+            if (apiKey != null &&
+                apiSecret != null &&
+                apiKey.isNotEmpty &&
+                apiSecret.isNotEmpty) {
+
+              options.headers["Authorization"] =
+              "token $apiKey:$apiSecret";
+            }
           }
 
           return handler.next(options);
@@ -70,12 +77,22 @@ class ApiService {
     required String url,
     dynamic data,
     Options? options,
+    bool requiresAuth = true,
   }) async {
+
+    final requestOptions = options ?? Options();
+
+    if (!requiresAuth) {
+      requestOptions.headers = {
+        ...?requestOptions.headers,
+        "Authorization": null,
+      };
+    }
 
     return await dio.post(
       url,
       data: data,
-      options: options,
+      options: requestOptions,
     );
   }
 

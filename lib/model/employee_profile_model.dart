@@ -6,6 +6,8 @@ class EmployeeProfileModel {
   final String cellNumber;
   final String gender;
   final DateTime? dateOfBirth;
+  final DateTime? dateOfJoining;
+
   final String company;
   final String department;
   final String designation;
@@ -22,6 +24,8 @@ class EmployeeProfileModel {
     required this.cellNumber,
     required this.gender,
     required this.dateOfBirth,
+    required this.dateOfJoining,
+
     required this.company,
     required this.department,
     required this.designation,
@@ -41,6 +45,8 @@ class EmployeeProfileModel {
       cellNumber: text('cell_number'),
       gender: text('gender'),
       dateOfBirth: DateTime.tryParse(text('date_of_birth')),
+      dateOfJoining: DateTime.tryParse(text('date_of_joining')),
+
       company: text('company'),
       department: text('department'),
       designation: text('designation'),

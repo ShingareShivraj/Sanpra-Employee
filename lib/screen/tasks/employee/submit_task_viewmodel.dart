@@ -82,12 +82,20 @@ class SubmitTaskViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       String? photoUrl;
+
       if (selectedPhotoPath != null) {
-        if (photoUploader == null) {
-          throw Exception('Photo upload is not configured.');
+        if (photoUploader != null) {
+          photoUrl = await photoUploader!(selectedPhotoPath!);
+        } else {
+          photoUrl = await _taskService.uploadTaskProof(
+            taskName: taskName,
+            localPath: selectedPhotoPath!,
+          );
         }
-        photoUrl = await photoUploader!(selectedPhotoPath!);
-        if (photoUrl.trim().isEmpty) throw Exception('Photo upload failed.');
+
+        if (photoUrl.trim().isEmpty) {
+          throw Exception('Proof file upload failed.');
+        }
       }
 
       submittedTask = await _taskService.submitTaskCompletion(

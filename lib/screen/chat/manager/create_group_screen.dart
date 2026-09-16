@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../model/chat/chat_member_model.dart';
 import 'create_group_viewmodel.dart';
@@ -43,6 +46,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
     final result = await _viewModel.create(
       groupName: _nameController.text,
       description: _descriptionController.text,
+      groupImage: _viewModel.groupImage,
     );
     if (!mounted) return;
     if (result != null) {
@@ -69,6 +73,39 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         bottomNavigationBar: _viewModel.loading ? null : _buildBottomAction(),
       ),
     );
+  }
+
+  Future<void> _pickGroupImage() async {
+    try {
+      final picker = ImagePicker();
+      final image = await picker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
+
+      if (image == null || !mounted) return;
+
+      _viewModel.setGroupImage(File(image.path));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not select group image: ${_cleanImageError(e)}'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _removeGroupImage() {
+    _viewModel.clearGroupImage();
+  }
+
+  String _cleanImageError(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    return message.isEmpty ? 'Please try again.' : message;
   }
 
   Widget _buildBody() {
@@ -117,6 +154,8 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   }
 
   Widget _groupDetailsCard() {
+    final groupImage = _viewModel.groupImage;
+
     return Container(
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
@@ -124,32 +163,175 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         borderRadius: BorderRadius.circular(17),
         border: Border.all(color: const Color(0xFFE2E7EF)),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Row(children: [
-          Icon(Icons.forum_rounded, color: _primary, size: 19),
-          SizedBox(width: 7),
-          Text('Group details', style: TextStyle(color: _text, fontSize: 13.5, fontWeight: FontWeight.w800)),
-        ]),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _nameController,
-          maxLength: 140,
-          textCapitalization: TextCapitalization.words,
-          style: const TextStyle(fontSize: 12.5, color: _text),
-          validator: (value) => value?.trim().isEmpty ?? true ? 'Enter a group name' : null,
-          decoration: _inputDecoration('Group name', Icons.groups_rounded, counter: false),
-        ),
-        const SizedBox(height: 9),
-        TextFormField(
-          controller: _descriptionController,
-          maxLength: 1000,
-          minLines: 2,
-          maxLines: 3,
-          textCapitalization: TextCapitalization.sentences,
-          style: const TextStyle(fontSize: 12.5, color: _text),
-          decoration: _inputDecoration('Description (optional)', Icons.notes_rounded, counter: false),
-        ),
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.forum_rounded, color: _primary, size: 19),
+              SizedBox(width: 7),
+              Text(
+                'Group details',
+                style: TextStyle(
+                  color: _text,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 31,
+                    backgroundColor: const Color(0xFFE7EEFF),
+                    backgroundImage:
+                    groupImage != null ? FileImage(groupImage) : null,
+                    child: groupImage == null
+                        ? const Icon(
+                      Icons.groups_rounded,
+                      color: _primary,
+                      size: 29,
+                    )
+                        : null,
+                  ),
+                  Positioned(
+                    right: -2,
+                    bottom: -2,
+                    child: Material(
+                      color: _primary,
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: _pickGroupImage,
+                        customBorder: const CircleBorder(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(6),
+                          child: Icon(
+                            Icons.camera_alt_rounded,
+                            color: Colors.white,
+                            size: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Group image',
+                      style: TextStyle(
+                        color: _text,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      groupImage == null
+                          ? 'Add an image for this chat group (optional).'
+                          : 'Image selected. You can change or remove it.',
+                      style: const TextStyle(
+                        color: _muted,
+                        fontSize: 9.5,
+                        height: 1.25,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _pickGroupImage,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _primary,
+                            side: const BorderSide(color: Color(0xFFBDD0FF)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9,
+                              vertical: 6,
+                            ),
+                            minimumSize: const Size(0, 30),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                          ),
+                          icon: const Icon(Icons.image_rounded, size: 15),
+                          label: Text(
+                            groupImage == null ? 'Choose image' : 'Change',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        if (groupImage != null)
+                          TextButton(
+                            onPressed: _removeGroupImage,
+                            style: TextButton.styleFrom(
+                              foregroundColor: const Color(0xFFD92D20),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 6,
+                              ),
+                              minimumSize: const Size(0, 30),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Remove',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _nameController,
+            maxLength: 140,
+            textCapitalization: TextCapitalization.words,
+            style: const TextStyle(fontSize: 12.5, color: _text),
+            validator: (value) =>
+            value?.trim().isEmpty ?? true ? 'Enter a group name' : null,
+            decoration: _inputDecoration(
+              'Group name',
+              Icons.groups_rounded,
+              counter: false,
+            ),
+          ),
+          const SizedBox(height: 9),
+          TextFormField(
+            controller: _descriptionController,
+            maxLength: 1000,
+            minLines: 2,
+            maxLines: 3,
+            textCapitalization: TextCapitalization.sentences,
+            style: const TextStyle(fontSize: 12.5, color: _text),
+            decoration: _inputDecoration(
+              'Description (optional)',
+              Icons.notes_rounded,
+              counter: false,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -190,9 +372,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
         prefixIcon: const Icon(Icons.search_rounded, color: _muted, size: 18),
         suffixIcon: _viewModel.searching
             ? const Padding(
-                padding: EdgeInsets.all(13),
-                child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: _primary, strokeWidth: 2)),
-              )
+          padding: EdgeInsets.all(13),
+          child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: _primary, strokeWidth: 2)),
+        )
             : null,
         filled: true,
         fillColor: Colors.white,
@@ -317,17 +499,17 @@ class _CreateError extends StatelessWidget {
   const _CreateError({required this.message, required this.onRetry});
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.cloud_off_rounded, color: _muted, size: 42),
-            const SizedBox(height: 9),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 11.5)),
-            const SizedBox(height: 12),
-            FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 17), label: const Text('Try again')),
-          ]),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.cloud_off_rounded, color: _muted, size: 42),
+        const SizedBox(height: 9),
+        Text(message, textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 11.5)),
+        const SizedBox(height: 12),
+        FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 17), label: const Text('Try again')),
+      ]),
+    ),
+  );
 }
 
 class _InlineError extends StatelessWidget {
@@ -336,27 +518,27 @@ class _InlineError extends StatelessWidget {
   const _InlineError({required this.message, required this.onClose});
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.fromLTRB(12, 5, 12, 0),
-        padding: const EdgeInsets.fromLTRB(10, 7, 4, 7),
-        decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFD92D20), size: 17),
-          const SizedBox(width: 7),
-          Expanded(child: Text(message, style: const TextStyle(color: Color(0xFFB42318), fontSize: 10.5))),
-          IconButton(onPressed: onClose, visualDensity: VisualDensity.compact, icon: const Icon(Icons.close_rounded, color: Color(0xFFB42318), size: 16)),
-        ]),
-      );
+    margin: const EdgeInsets.fromLTRB(12, 5, 12, 0),
+    padding: const EdgeInsets.fromLTRB(10, 7, 4, 7),
+    decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(12)),
+    child: Row(children: [
+      const Icon(Icons.error_outline_rounded, color: Color(0xFFD92D20), size: 17),
+      const SizedBox(width: 7),
+      Expanded(child: Text(message, style: const TextStyle(color: Color(0xFFB42318), fontSize: 10.5))),
+      IconButton(onPressed: onClose, visualDensity: VisualDensity.compact, icon: const Icon(Icons.close_rounded, color: Color(0xFFB42318), size: 16)),
+    ]),
+  );
 }
 
 class _NoEmployees extends StatelessWidget {
   const _NoEmployees();
   @override
   Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.all(30),
-        child: Column(children: [
-          Icon(Icons.person_search_rounded, color: _muted, size: 38),
-          SizedBox(height: 8),
-          Text('No employees found', style: TextStyle(color: _text, fontSize: 13, fontWeight: FontWeight.w700)),
-        ]),
-      );
+    padding: EdgeInsets.all(30),
+    child: Column(children: [
+      Icon(Icons.person_search_rounded, color: _muted, size: 38),
+      SizedBox(height: 8),
+      Text('No employees found', style: TextStyle(color: _text, fontSize: 13, fontWeight: FontWeight.w700)),
+    ]),
+  );
 }

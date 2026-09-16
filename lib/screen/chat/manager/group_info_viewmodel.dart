@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -22,6 +23,7 @@ class GroupInfoViewModel extends ChangeNotifier {
   bool _loadingEmployees = false;
   String? _busyEmployee;
   String? _error;
+  File? _groupImage;
 
   ChatGroupDetailsModel? get details => _details;
   ChatGroupModel? get group => _details?.group;
@@ -32,9 +34,21 @@ class GroupInfoViewModel extends ChangeNotifier {
   bool get loadingEmployees => _loadingEmployees;
   String? get busyEmployee => _busyEmployee;
   String? get error => _error;
+  File? get groupImage => _groupImage;
   bool get canManage => group?.canManage ?? false;
   bool get isActive => group?.isActive ?? false;
   int get selectedNewCount => _pendingMembers.length;
+
+  void setGroupImage(File? image) {
+    _groupImage = image;
+    notifyListeners();
+  }
+
+  void clearGroupImage() {
+    if (_groupImage == null) return;
+    _groupImage = null;
+    notifyListeners();
+  }
 
   Future<void> initialise() async {
     if (_loading) return;
@@ -67,7 +81,11 @@ class GroupInfoViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<bool> updateDetails({required String name, String? description}) async {
+  Future<bool> updateDetails({
+    required String name,
+    String? description,
+    File? groupImage,
+  }) async {
     if (_saving || !canManage) return false;
     if (name.trim().isEmpty) {
       _error = 'Group name is required.';
@@ -82,7 +100,9 @@ class GroupInfoViewModel extends ChangeNotifier {
         group: groupName,
         groupName: name.trim(),
         description: description?.trim() ?? '',
+        groupImage: groupImage ?? _groupImage,
       );
+      _groupImage = null;
       return true;
     } catch (error) {
       _error = _cleanError(error);
@@ -114,7 +134,7 @@ class GroupInfoViewModel extends ChangeNotifier {
     _searchTimer?.cancel();
     _searchTimer = Timer(
       const Duration(milliseconds: 350),
-      () => loadAvailableEmployees(search: value.trim()),
+          () => loadAvailableEmployees(search: value.trim()),
     );
   }
 

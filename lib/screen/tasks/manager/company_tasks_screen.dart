@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../model/task_model.dart';
 import 'company_tasks_viewmodel.dart';
 import 'review_task_screen.dart';
+import 'task_info_screen.dart';
 
 const _primary = Color(0xFF1B5FE0);
 const _accent = Color(0xFF4E8CFF);
@@ -631,33 +632,29 @@ class _CompanyTasksScreenState extends State<CompanyTasksScreen> {
   }
 
   Future<void> _openTask(TaskModel task) async {
-    if (!task.isPendingReview) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            content: const Row(
-              children: [
-                Icon(Icons.info_outline_rounded, color: Colors.white, size: 19),
-                SizedBox(width: 8),
-                Expanded(child: Text('Only pending-review tasks can be reviewed.')),
-              ],
-            ),
-          ),
-        );
+    // Pending Review → open the existing review screen.
+    if (task.isPendingReview) {
+      final reviewed = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ReviewTaskScreen(task: task),
+        ),
+      );
+
+      if (reviewed == true && mounted) {
+        await viewModel.refresh();
+      }
+
       return;
     }
 
-    final reviewed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => ReviewTaskScreen(task: task)),
+    // All other statuses → open the new Task Info screen.
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => TaskInfoScreen(task: task),
+      ),
     );
-
-    if (reviewed == true && mounted) {
-      await viewModel.refresh();
-    }
   }
+
 
   Future<void> _clearAll() async {
     searchController.clear();
@@ -693,10 +690,15 @@ class _TaskCard extends StatelessWidget {
     final style = _statusStyle(task.status);
     final dueDate = task.expectedEndDate ?? task.dueDate;
     final title = task.subject.trim().isEmpty ? task.name : task.subject.trim();
-    final assignee = task.assignedTo ??
-        (task.assignees.isNotEmpty
-            ? (task.assignees.first.fullName ?? task.assignees.first.user)
-            : null);
+    // ==========================================================
+// NEW: SHOW ALL ASSIGNED EMPLOYEES ON THE TASK CARD
+// ==========================================================
+// A Task can have multiple employees assigned.
+// Show all employee names instead of only the first one.
+    final assignee = task.assignees
+        .map((employee) => employee.fullName ?? employee.user)
+        .where((name) => name.trim().isNotEmpty)
+        .join(', ');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 9),
@@ -789,7 +791,7 @@ class _TaskCard extends StatelessWidget {
                                   ? const Color(0xFFD92D20)
                                   : _muted,
                             ),
-                          if (assignee != null && assignee.trim().isNotEmpty)
+                          if (assignee.trim().isNotEmpty)
                             _MetaPill(
                               icon: Icons.person_outline_rounded,
                               label: assignee,

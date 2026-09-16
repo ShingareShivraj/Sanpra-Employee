@@ -88,6 +88,44 @@ class AuthService {
   }
 
   // ==========================================================
+// FORGOT PASSWORD
+// ==========================================================
+
+  Future<void> forgotPassword({
+    required String username,
+  }) async {
+    try {
+      final Response response = await _api.post(
+        url: ApiEndpoints.forgotPassword,
+        requiresAuth: false,
+        data: {
+          "user": username.trim(),
+        },
+      );
+
+      print("Forgot Password Response : ${response.data}");
+    } on DioException catch (e) {
+      final responseData = e.response?.data;
+
+      String message = "Unable to process password reset request.";
+
+      if (responseData is Map<String, dynamic>) {
+        message =
+            responseData["message"]?.toString() ??
+                responseData["_server_messages"]?.toString() ??
+                e.message ??
+                message;
+      } else if (e.message != null) {
+        message = e.message!;
+      }
+
+      throw Exception(message);
+    } catch (e) {
+      throw Exception(e.toString());
+    }
+  }
+
+  // ==========================================================
   // LOGOUT
   // ==========================================================
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../model/employee_model.dart';
+import '../../../model/task_model.dart';
 import 'create_task_viewmodel.dart';
 
 const _blue = Color(0xFF1B5FE0);
@@ -20,22 +21,25 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
   final _formKey = GlobalKey<FormState>();
   final _subjectController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _projectController = TextEditingController();
   final _employeeSearchController = TextEditingController();
   late final CreateTaskViewModel viewModel;
   String _employeeQuery = '';
+  String _projectQuery = '';
 
+  @override
   @override
   void initState() {
     super.initState();
-    viewModel = CreateTaskViewModel()..loadEmployees();
+
+    viewModel = CreateTaskViewModel()
+      ..loadEmployees()
+      ..loadProjects();
   }
 
   @override
   void dispose() {
     _subjectController.dispose();
     _descriptionController.dispose();
-    _projectController.dispose();
     _employeeSearchController.dispose();
     viewModel.dispose();
     super.dispose();
@@ -61,7 +65,6 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
     final task = await viewModel.create(
       subject: _subjectController.text,
       description: _descriptionController.text,
-      project: _projectController.text,
     );
     if (!mounted || task == null) return;
 
@@ -87,7 +90,22 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
       return text.contains(query);
     }).toList();
   }
+  List<ProjectModel> _visibleProjects(List<ProjectModel> projects) {
+    final query = _projectQuery.trim().toLowerCase();
 
+    if (query.isEmpty) return projects;
+
+    return projects.where((project) {
+      final text = [
+        project.name,
+        project.projectName,
+        project.status,
+        project.priority,
+      ].whereType<String>().join(' ').toLowerCase();
+
+      return text.contains(query);
+    }).toList();
+  }
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -196,15 +214,21 @@ class _CreateTaskScreenState extends State<CreateTaskScreen> {
                           ],
                         ),
                         const SizedBox(height: 9),
-                        TextFormField(
-                          controller: _projectController,
-                          textInputAction: TextInputAction.done,
-                          style: const TextStyle(fontSize: 14, color: _ink),
-                          decoration: _inputDecoration(
-                            label: 'Project ID',
-                            hint: 'Optional',
-                            icon: Icons.work_outline_rounded,
-                          ),
+                        _ProjectSection(
+                          viewModel: viewModel,
+                          projects: _visibleProjects(viewModel.projects),
+                          query: _projectQuery,
+                          onSearch: (value) {
+                            setState(() => _projectQuery = value);
+
+                            viewModel.loadProjects(
+                              search: value,
+                            );
+                          },
+                          onClearSearch: () {
+                            setState(() => _projectQuery = '');
+                            viewModel.loadProjects();
+                          },
                         ),
                       ],
                     ),
@@ -428,6 +452,500 @@ class _DateField extends StatelessWidget {
               InkWell(onTap: onClear, child: const Padding(padding: EdgeInsets.all(3), child: Icon(Icons.close_rounded, size: 16, color: _muted))),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ProjectSection extends StatelessWidget {
+  const _ProjectSection({
+    required this.viewModel,
+    required this.projects,
+    required this.query,
+    required this.onSearch,
+    required this.onClearSearch,
+  });
+
+  final CreateTaskViewModel viewModel;
+  final List<ProjectModel> projects;
+  final String query;
+  final ValueChanged<String> onSearch;
+  final VoidCallback onClearSearch;
+
+  Future<void> _openProjectPicker(BuildContext context) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return _ProjectPickerSheet(
+          viewModel: viewModel,
+          projects: projects,
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = viewModel.selectedProject;
+
+    final selectedTitle =
+    selected?.projectName?.trim().isNotEmpty == true
+        ? selected!.projectName!
+        : selected?.name;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Project',
+          style: TextStyle(
+            fontSize: 12,
+            color: _muted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+
+        const SizedBox(height: 6),
+
+        InkWell(
+          onTap: () => _openProjectPicker(context),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            height: 53,
+            padding: const EdgeInsets.symmetric(horizontal: 11),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF9FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: selected == null
+                    ? const Color(0xFFE2E6ED)
+                    : const Color(0xFFB9CDF8),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  selected == null
+                      ? Icons.work_outline_rounded
+                      : Icons.check_circle_rounded,
+                  size: 19,
+                  color: selected == null
+                      ? _muted
+                      : const Color(0xFF248A5A),
+                ),
+
+                const SizedBox(width: 9),
+
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        selected == null
+                            ? 'Select project'
+                            : selectedTitle ?? 'Selected project',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: selected == null ? _muted : _ink,
+                        ),
+                      ),
+
+                      const SizedBox(height: 2),
+
+                      Text(
+                        selected == null
+                            ? 'Search by project name or ID'
+                            : selected.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          color: _muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                if (selected != null)
+                  IconButton(
+                    onPressed: () => viewModel.setProject(null),
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 30,
+                      minHeight: 30,
+                    ),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      size: 17,
+                      color: _muted,
+                    ),
+                  )
+                else
+                  const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: _muted,
+                    size: 22,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectPickerSheet extends StatefulWidget {
+  const _ProjectPickerSheet({
+    required this.viewModel,
+    required this.projects,
+  });
+
+  final CreateTaskViewModel viewModel;
+  final List<ProjectModel> projects;
+
+  @override
+  State<_ProjectPickerSheet> createState() => _ProjectPickerSheetState();
+}
+
+class _ProjectPickerSheetState extends State<_ProjectPickerSheet> {
+  late final TextEditingController _searchController;
+
+  String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<ProjectModel> _filteredProjects() {
+    final query = _searchQuery.trim().toLowerCase();
+
+    if (query.isEmpty) {
+      return widget.projects;
+    }
+
+    return widget.projects.where((project) {
+      final text = [
+        project.name,
+        project.projectName,
+        project.status,
+        project.priority,
+      ].whereType<String>().join(' ').toLowerCase();
+
+      return text.contains(query);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final projects = _filteredProjects();
+
+    return Container(
+      height: MediaQuery.of(context).size.height * .72,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+      ),
+      child: Column(
+        children: [
+          const SizedBox(height: 10),
+
+          // Drag handle
+          Container(
+            width: 38,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD5DAE3),
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 10, 10),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Select Project',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: _ink,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Search and choose a project',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: _muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    color: _muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: _ink,
+              ),
+              decoration: _inputDecoration(
+                label: 'Search projects',
+                hint: 'Project name or ID',
+                icon: Icons.search_rounded,
+              ).copyWith(
+                suffixIcon: _searchQuery.isEmpty
+                    ? null
+                    : IconButton(
+                  onPressed: () {
+                    _searchController.clear();
+
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          Expanded(
+            child: widget.viewModel.loadingProjects
+                ? const Center(
+              child: CircularProgressIndicator(
+                strokeWidth: 2.2,
+                color: _blue,
+              ),
+            )
+                : projects.isEmpty
+                ? const _ProjectEmpty(
+              message: 'No projects found.',
+            )
+                : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(
+                16,
+                0,
+                16,
+                20,
+              ),
+              itemCount: projects.length,
+              separatorBuilder: (_, __) =>
+              const Divider(
+                height: 1,
+                indent: 54,
+                endIndent: 8,
+                color: Color(0xFFE9ECF2),
+              ),
+              itemBuilder: (context, index) {
+                final project = projects[index];
+
+                final isSelected =
+                    widget.viewModel.selectedProject?.name ==
+                        project.name;
+
+                return _ProjectTile(
+                  project: project,
+                  selected: isSelected,
+                  onTap: () {
+                    widget.viewModel.setProject(project);
+
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProjectTile extends StatelessWidget {
+  const _ProjectTile({
+    required this.project,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ProjectModel project;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = project.projectName?.trim().isNotEmpty == true
+        ? project.projectName!
+        : project.name;
+
+    return Material(
+      color: selected
+          ? const Color(0xFFEEF4FF)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            9,
+            9,
+            7,
+            9,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 35,
+                height: 35,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? _blue
+                      : const Color(0xFFE8ECF3),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(
+                  Icons.work_outline_rounded,
+                  size: 18,
+                  color: selected
+                      ? Colors.white
+                      : _muted,
+                ),
+              ),
+
+              const SizedBox(width: 9),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: _ink,
+                      ),
+                    ),
+
+                    const SizedBox(height: 2),
+
+                    Text(
+                      project.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: _muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (selected)
+                const Icon(
+                  Icons.check_circle_rounded,
+                  color: _blue,
+                  size: 20,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectEmpty extends StatelessWidget {
+  const _ProjectEmpty({
+    required this.message,
+    this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.work_off_outlined,
+            color: Color(0xFF9AA3B2),
+            size: 28,
+          ),
+
+          const SizedBox(height: 5),
+
+          Text(
+            message,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: _muted,
+            ),
+          ),
+
+          if (onRetry != null)
+            TextButton(
+              onPressed: onRetry,
+              child: const Text(
+                'Try again',
+                style: TextStyle(
+                  fontSize: 12.5,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

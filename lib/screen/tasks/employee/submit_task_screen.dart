@@ -1,4 +1,8 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import 'submit_task_viewmodel.dart';
 
@@ -33,6 +37,7 @@ class SubmitTaskScreen extends StatefulWidget {
 class _SubmitTaskScreenState extends State<SubmitTaskScreen> {
   final remarksController = TextEditingController();
   late final SubmitTaskViewModel viewModel;
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -58,10 +63,79 @@ class _SubmitTaskScreenState extends State<SubmitTaskScreen> {
     super.dispose();
   }
 
-  Future<void> _pickPhoto() async {
-    if (widget.photoPicker == null || viewModel.submitting) return;
-    final path = await widget.photoPicker!();
-    if (path != null && mounted) viewModel.setPhoto(path);
+  Future<void> _selectProof() async {
+    if (viewModel.submitting) return;
+
+    final source = await showModalBottomSheet<_ProofSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => _ProofSourceSheet(
+        onSelected: (source) {
+          Navigator.pop(sheetContext, source);
+        },
+      ),
+    );
+
+    if (source == null || !mounted) return;
+
+    try {
+      String? selectedPath;
+
+      switch (source) {
+        case _ProofSource.camera:
+          final image = await _imagePicker.pickImage(
+            source: ImageSource.camera,
+            imageQuality: 82,
+            maxWidth: 1920,
+          );
+          selectedPath = image?.path;
+          break;
+
+        case _ProofSource.gallery:
+          final image = await _imagePicker.pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 88,
+            maxWidth: 1920,
+          );
+          selectedPath = image?.path;
+          break;
+
+        case _ProofSource.file:
+          final result = await FilePicker.platform.pickFiles(
+            allowMultiple: false,
+            type: FileType.custom,
+            allowedExtensions: [
+              'jpg',
+              'jpeg',
+              'png',
+              'webp',
+              'pdf',
+              'doc',
+              'docx',
+              'xls',
+              'xlsx',
+              'txt',
+            ],
+          );
+          selectedPath = result?.files.single.path;
+          break;
+      }
+
+      if (selectedPath != null &&
+          selectedPath.trim().isNotEmpty &&
+          mounted) {
+        viewModel.setPhoto(selectedPath);
+      }
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Unable to select proof: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _submit() async {
@@ -156,28 +230,33 @@ class _SubmitTaskScreenState extends State<SubmitTaskScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              if (widget.photoPicker != null)
-                _EvidenceTile(
-                  icon: Icons.add_a_photo_outlined,
-                  iconColor: const Color(0xFF7A52CC),
-                  iconBackground: const Color(0xFFF0EAFE),
-                  title: 'Proof photo',
-                  subtitle: viewModel.selectedPhotoPath == null
-                      ? 'Optional · Add a clear work photo'
-                      : _fileName(viewModel.selectedPhotoPath!),
-                  completed: viewModel.selectedPhotoPath != null,
-                  busy: false,
-                  actionLabel: viewModel.selectedPhotoPath == null
-                      ? 'Add photo'
-                      : 'Change',
-                  onTap: viewModel.submitting ? null : _pickPhoto,
-                  onRemove: viewModel.selectedPhotoPath == null ||
-                      viewModel.submitting
-                      ? null
-                      : viewModel.removePhoto,
+              _EvidenceTile(
+                icon: Icons.attach_file_rounded,
+                iconColor: const Color(0xFF7A52CC),
+                iconBackground: const Color(0xFFF0EAFE),
+                title: 'Proof attachment',
+                subtitle: viewModel.selectedPhotoPath == null
+                    ? 'Optional · Camera, gallery or file'
+                    : _fileName(viewModel.selectedPhotoPath!),
+                completed: viewModel.selectedPhotoPath != null,
+                busy: false,
+                actionLabel: viewModel.selectedPhotoPath == null
+                    ? 'Add proof'
+                    : 'Change',
+                onTap: viewModel.submitting ? null : _selectProof,
+                onRemove: viewModel.selectedPhotoPath == null ||
+                    viewModel.submitting
+                    ? null
+                    : viewModel.removePhoto,
+              ),
+              if (viewModel.selectedPhotoPath != null &&
+                  _isImageFile(viewModel.selectedPhotoPath!)) ...[
+                const SizedBox(height: 9),
+                _SelectedImagePreview(
+                  path: viewModel.selectedPhotoPath!,
                 ),
-              if (widget.photoPicker != null &&
-                  widget.locationProvider != null)
+              ],
+              if (widget.locationProvider != null)
                 const SizedBox(height: 9),
               if (widget.locationProvider != null)
                 _EvidenceTile(
@@ -225,8 +304,179 @@ class _SubmitTaskScreenState extends State<SubmitTaskScreen> {
     final normalized = path.replaceAll('\\', '/');
     return normalized.split('/').last;
   }
+
+  bool _isImageFile(String filePath) {
+    final value = filePath.toLowerCase();
+
+    return value.endsWith('.jpg') ||
+        value.endsWith('.jpeg') ||
+        value.endsWith('.png') ||
+        value.endsWith('.webp');
+  }
+
+
 }
 
+enum _ProofSource { camera, gallery, file }
+
+class _ProofSourceSheet extends StatelessWidget {
+  const _ProofSourceSheet({
+    required this.onSelected,
+  });
+
+  final ValueChanged<_ProofSource> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(24),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD7DCE5),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Add completion proof',
+              style: TextStyle(
+                color: _ink,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Proof is optional. Select any one option.',
+              style: TextStyle(
+                color: _muted,
+                fontSize: 12,
+              ),
+            ),
+            const SizedBox(height: 14),
+            _ProofSourceTile(
+              icon: Icons.camera_alt_outlined,
+              title: 'Take photo',
+              subtitle: 'Open camera',
+              onTap: () => onSelected(_ProofSource.camera),
+            ),
+            _ProofSourceTile(
+              icon: Icons.photo_library_outlined,
+              title: 'Choose from gallery',
+              subtitle: 'Select an existing image',
+              onTap: () => onSelected(_ProofSource.gallery),
+            ),
+            _ProofSourceTile(
+              icon: Icons.attach_file_rounded,
+              title: 'Choose file',
+              subtitle: 'PDF, document, spreadsheet or image',
+              onTap: () => onSelected(_ProofSource.file),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProofSourceTile extends StatelessWidget {
+  const _ProofSourceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      onTap: onTap,
+      leading: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: _primary.withOpacity(.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: _primary, size: 21),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(
+          color: _ink,
+          fontSize: 13.5,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          color: _muted,
+          fontSize: 11.5,
+        ),
+      ),
+      trailing: const Icon(
+        Icons.chevron_right_rounded,
+        color: Color(0xFF98A2B3),
+      ),
+    );
+  }
+}
+
+class _SelectedImagePreview extends StatelessWidget {
+  const _SelectedImagePreview({
+    required this.path,
+  });
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.file(
+        File(path),
+        width: double.infinity,
+        height: 180,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          height: 100,
+          color: const Color(0xFFF2F4F7),
+          alignment: Alignment.center,
+          child: const Text(
+            'Unable to preview selected image',
+            style: TextStyle(
+              color: _muted,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 class _TaskHeader extends StatelessWidget {
   const _TaskHeader({required this.taskName});
 

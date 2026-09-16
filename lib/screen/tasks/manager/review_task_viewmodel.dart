@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-
+import 'package:open_filex/open_filex.dart';
 import '../../../model/task_model.dart';
 import '../../../services/task_manager_service.dart';
 import '../../../services/task_service.dart';
@@ -20,6 +20,7 @@ class ReviewTaskViewModel extends ChangeNotifier {
   String? errorMessage;
   bool loading = false;
   bool submitting = false;
+  bool openingProof = false;
   bool _disposed = false;
   bool _backendCanReview = false;
 
@@ -80,6 +81,35 @@ class ReviewTaskViewModel extends ChangeNotifier {
       return false;
     } finally {
       submitting = false;
+      _notify();
+    }
+  }
+  Future<bool> openProof(String fileUrl) async {
+    if (openingProof || fileUrl.trim().isEmpty) return false;
+
+    openingProof = true;
+    errorMessage = null;
+    _notify();
+
+    try {
+      final localPath = await _taskService.downloadTaskProof(fileUrl);
+
+      final result = await OpenFilex.open(localPath);
+
+      if (result.type != ResultType.done) {
+        throw Exception(
+          result.message.isNotEmpty
+              ? result.message
+              : 'Unable to open proof file.',
+        );
+      }
+
+      return true;
+    } catch (error) {
+      errorMessage = _cleanError(error);
+      return false;
+    } finally {
+      openingProof = false;
       _notify();
     }
   }

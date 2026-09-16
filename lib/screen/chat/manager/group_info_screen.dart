@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../model/chat/chat_member_model.dart';
 import 'group_info_viewmodel.dart';
@@ -42,54 +45,162 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
   Future<void> _editGroup() async {
     final group = _viewModel.group;
     if (group == null || !_viewModel.canManage) return;
+
+    File? selectedImage = _viewModel.groupImage;
     final nameController = TextEditingController(text: group.groupName);
-    final descriptionController = TextEditingController(text: group.description ?? '');
+    final descriptionController =
+    TextEditingController(text: group.description ?? '');
     final formKey = GlobalKey<FormState>();
+
     final save = await showDialog<bool>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Edit group', style: TextStyle(color: _text, fontSize: 16, fontWeight: FontWeight.w800)),
-        content: Form(
-          key: formKey,
-          child: SingleChildScrollView(
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              TextFormField(
-                controller: nameController,
-                maxLength: 140,
-                style: const TextStyle(fontSize: 12.5),
-                validator: (value) => (value?.trim().isEmpty ?? true) ? 'Enter a group name' : null,
-                decoration: _dialogInput('Group name'),
-              ),
-              const SizedBox(height: 8),
-              TextFormField(
-                controller: descriptionController,
-                maxLength: 1000,
-                minLines: 2,
-                maxLines: 4,
-                style: const TextStyle(fontSize: 12.5),
-                decoration: _dialogInput('Description', counter: false),
-              ),
-            ]),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Text(
+            'Edit group',
+            style: TextStyle(
+              color: _text,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
           ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  GestureDetector(
+                    onTap: () async {
+                      try {
+                        final picker = ImagePicker();
+                        final image = await picker.pickImage(
+                          source: ImageSource.gallery,
+                          imageQuality: 85,
+                          maxWidth: 1200,
+                          maxHeight: 1200,
+                        );
+                        if (image == null) return;
+
+                        selectedImage = File(image.path);
+                        setDialogState(() {});
+                      } catch (error) {
+                        if (!mounted) return;
+                        _showSnack(
+                          'Could not select image: ${_cleanImageError(error)}',
+                          error: true,
+                        );
+                      }
+                    },
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        CircleAvatar(
+                          radius: 38,
+                          backgroundColor: const Color(0xFFE7EEFF),
+                          backgroundImage: selectedImage != null
+                              ? FileImage(selectedImage!)
+                              : null,
+                          child: selectedImage == null
+                              ? Text(
+                            group.groupName.isEmpty
+                                ? 'G'
+                                : group.groupName[0].toUpperCase(),
+                            style: const TextStyle(
+                              color: _primary,
+                              fontSize: 25,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          )
+                              : null,
+                        ),
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: const BoxDecoration(
+                              color: _primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_rounded,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Tap image to change',
+                    style: TextStyle(color: _muted, fontSize: 9.5),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: nameController,
+                    maxLength: 140,
+                    style: const TextStyle(fontSize: 12.5),
+                    validator: (value) => (value?.trim().isEmpty ?? true)
+                        ? 'Enter a group name'
+                        : null,
+                    decoration: _dialogInput('Group name'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: descriptionController,
+                    maxLength: 1000,
+                    minLines: 2,
+                    maxLines: 4,
+                    style: const TextStyle(fontSize: 12.5),
+                    decoration:
+                    _dialogInput('Description', counter: false),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            if (selectedImage != null)
+              TextButton(
+                onPressed: () {
+                  selectedImage = null;
+                  setDialogState(() {});
+                },
+                child: const Text(
+                  'Remove image',
+                  style: TextStyle(color: _danger),
+                ),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState?.validate() ?? false) {
+                  Navigator.pop(dialogContext, true);
+                }
+              },
+              style: FilledButton.styleFrom(backgroundColor: _primary),
+              child: const Text('Save'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              if (formKey.currentState?.validate() ?? false) Navigator.pop(dialogContext, true);
-            },
-            style: FilledButton.styleFrom(backgroundColor: _primary),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
+
     if (save == true) {
       final updated = await _viewModel.updateDetails(
         name: nameController.text,
         description: descriptionController.text,
+        groupImage: selectedImage,
       );
+
       if (updated) {
         _changed = true;
         _showSnack('Group details updated.');
@@ -97,8 +208,14 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
         _showSnack(_viewModel.error!, error: true);
       }
     }
+
     nameController.dispose();
     descriptionController.dispose();
+  }
+
+  String _cleanImageError(Object error) {
+    final message = error.toString().replaceFirst('Exception: ', '').trim();
+    return message.isEmpty ? 'Please try again.' : message;
   }
 
   Future<void> _toggleActive() async {
@@ -201,14 +318,14 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                 child: _viewModel.availableEmployees.isEmpty
                     ? const Center(child: Text('No employees available to add.', style: TextStyle(color: _muted, fontSize: 11.5)))
                     : ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
-                        itemCount: _viewModel.availableEmployees.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 6),
-                        itemBuilder: (_, index) => _AvailableEmployeeTile(
-                          employee: _viewModel.availableEmployees[index],
-                          viewModel: _viewModel,
-                        ),
-                      ),
+                  padding: const EdgeInsets.fromLTRB(12, 2, 12, 12),
+                  itemCount: _viewModel.availableEmployees.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 6),
+                  itemBuilder: (_, index) => _AvailableEmployeeTile(
+                    employee: _viewModel.availableEmployees[index],
+                    viewModel: _viewModel,
+                  ),
+                ),
               ),
               Container(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
@@ -220,14 +337,14 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
                     onPressed: _viewModel.saving || _viewModel.selectedNewCount == 0
                         ? null
                         : () async {
-                            final added = await _viewModel.addSelectedMembers();
-                            if (!mounted) return;
-                            if (added) {
-                              _changed = true;
-                              if (sheetContext.mounted) Navigator.pop(sheetContext);
-                              _showSnack('Members added successfully.');
-                            }
-                          },
+                      final added = await _viewModel.addSelectedMembers();
+                      if (!mounted) return;
+                      if (added) {
+                        _changed = true;
+                        if (sheetContext.mounted) Navigator.pop(sheetContext);
+                        _showSnack('Members added successfully.');
+                      }
+                    },
                     style: FilledButton.styleFrom(backgroundColor: _primary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13))),
                     icon: _viewModel.saving
                         ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
@@ -341,18 +458,18 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           ]),
           const SizedBox(height: 4),
           ..._viewModel.members.map((member) => Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: _MemberTile(
-                  member: member,
-                  canManage: _viewModel.canManage && _viewModel.isActive,
-                  busy: _viewModel.busyEmployee == member.employee,
-                  onPermissionChanged: (value) async {
-                    final changed = await _viewModel.updatePermission(member, value);
-                    if (changed) _changed = true;
-                  },
-                  onRemove: () => _removeMember(member),
-                ),
-              )),
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _MemberTile(
+              member: member,
+              canManage: _viewModel.canManage && _viewModel.isActive,
+              busy: _viewModel.busyEmployee == member.employee,
+              onPermissionChanged: (value) async {
+                final changed = await _viewModel.updatePermission(member, value);
+                if (changed) _changed = true;
+              },
+              onRemove: () => _removeMember(member),
+            ),
+          )),
         ],
       ),
     );
@@ -373,7 +490,18 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
           height: 56,
           alignment: Alignment.center,
           decoration: BoxDecoration(color: Colors.white.withOpacity(.15), borderRadius: BorderRadius.circular(17)),
-          child: Text(group.groupName.isEmpty ? 'G' : group.groupName[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+          child: group.groupImage != null && group.groupImage!.isNotEmpty
+              ? ClipRRect(
+            borderRadius: BorderRadius.circular(17),
+            child: Image.network(
+              group.groupImage!,
+              width: 56,
+              height: 56,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => _groupInitial(group.groupName),
+            ),
+          )
+              : _groupInitial(group.groupName),
         ),
         const SizedBox(width: 12),
         Expanded(
@@ -393,36 +521,45 @@ class _GroupInfoScreenState extends State<GroupInfoScreen> {
     );
   }
 
+  Widget _groupInitial(String name) => Text(
+    name.isEmpty ? 'G' : name[0].toUpperCase(),
+    style: const TextStyle(
+      color: Colors.white,
+      fontSize: 22,
+      fontWeight: FontWeight.w800,
+    ),
+  );
+
   Widget _descriptionCard(String? description) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE2E7EF))),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Description', style: TextStyle(color: _muted, fontSize: 9.5, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 4),
-          Text(description?.trim().isNotEmpty == true ? description! : 'No description provided.', style: const TextStyle(color: _text, fontSize: 11.5, height: 1.35)),
-        ]),
-      );
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15), border: Border.all(color: const Color(0xFFE2E7EF))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Description', style: TextStyle(color: _muted, fontSize: 9.5, fontWeight: FontWeight.w700)),
+      const SizedBox(height: 4),
+      Text(description?.trim().isNotEmpty == true ? description! : 'No description provided.', style: const TextStyle(color: _text, fontSize: 11.5, height: 1.35)),
+    ]),
+  );
 
   Widget _managementActions() => Row(children: [
-        Expanded(
-          child: _ActionCard(
-            icon: Icons.edit_rounded,
-            label: 'Edit details',
-            color: _primary,
-            onTap: _viewModel.saving ? null : _editGroup,
-          ),
-        ),
-        const SizedBox(width: 7),
-        Expanded(
-          child: _ActionCard(
-            icon: _viewModel.isActive ? Icons.pause_circle_outline_rounded : Icons.play_circle_outline_rounded,
-            label: _viewModel.isActive ? 'Deactivate' : 'Activate',
-            color: _viewModel.isActive ? _danger : const Color(0xFF16834A),
-            onTap: _viewModel.saving ? null : _toggleActive,
-          ),
-        ),
-      ]);
+    Expanded(
+      child: _ActionCard(
+        icon: Icons.edit_rounded,
+        label: 'Edit details',
+        color: _primary,
+        onTap: _viewModel.saving ? null : _editGroup,
+      ),
+    ),
+    const SizedBox(width: 7),
+    Expanded(
+      child: _ActionCard(
+        icon: _viewModel.isActive ? Icons.pause_circle_outline_rounded : Icons.play_circle_outline_rounded,
+        label: _viewModel.isActive ? 'Deactivate' : 'Activate',
+        color: _viewModel.isActive ? _danger : const Color(0xFF16834A),
+        onTap: _viewModel.saving ? null : _toggleActive,
+      ),
+    ),
+  ]);
 }
 
 class _MemberTile extends StatelessWidget {
@@ -441,57 +578,57 @@ class _MemberTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.fromLTRB(10, 8, 5, 8),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E7EF))),
-        child: Row(children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: const Color(0xFFE7EEFF),
-            child: Text(member.employeeName.isEmpty ? 'E' : member.employeeName[0].toUpperCase(), style: const TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.w800)),
+    padding: const EdgeInsets.fromLTRB(10, 8, 5, 8),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E7EF))),
+    child: Row(children: [
+      CircleAvatar(
+        radius: 18,
+        backgroundColor: const Color(0xFFE7EEFF),
+        child: Text(member.employeeName.isEmpty ? 'E' : member.employeeName[0].toUpperCase(), style: const TextStyle(color: _primary, fontSize: 12, fontWeight: FontWeight.w800)),
+      ),
+      const SizedBox(width: 9),
+      Expanded(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Flexible(child: Text(member.employeeName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w700))),
+            if (member.isCurrentUser) ...[
+              const SizedBox(width: 5),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2), decoration: BoxDecoration(color: const Color(0xFFE7EEFF), borderRadius: BorderRadius.circular(6)), child: const Text('YOU', style: TextStyle(color: _primary, fontSize: 7.5, fontWeight: FontWeight.w800))),
+            ],
+          ]),
+          const SizedBox(height: 2),
+          Text(member.canSend ? 'Can send messages' : 'Read only', style: TextStyle(color: member.canSend ? const Color(0xFF16834A) : _muted, fontSize: 9.5, fontWeight: FontWeight.w600)),
+        ]),
+      ),
+      if (busy)
+        const Padding(padding: EdgeInsets.all(11), child: SizedBox(width: 17, height: 17, child: CircularProgressIndicator(color: _primary, strokeWidth: 2)))
+      else if (canManage) ...[
+        SizedBox(
+          height: 28,
+          child: Switch.adaptive(
+            value: member.canSend,
+            onChanged: onPermissionChanged,
+            activeColor: _primary,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Flexible(child: Text(member.employeeName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: _text, fontSize: 12, fontWeight: FontWeight.w700))),
-                if (member.isCurrentUser) ...[
-                  const SizedBox(width: 5),
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2), decoration: BoxDecoration(color: const Color(0xFFE7EEFF), borderRadius: BorderRadius.circular(6)), child: const Text('YOU', style: TextStyle(color: _primary, fontSize: 7.5, fontWeight: FontWeight.w800))),
-                ],
-              ]),
-              const SizedBox(height: 2),
-              Text(member.canSend ? 'Can send messages' : 'Read only', style: TextStyle(color: member.canSend ? const Color(0xFF16834A) : _muted, fontSize: 9.5, fontWeight: FontWeight.w600)),
-            ]),
-          ),
-          if (busy)
-            const Padding(padding: EdgeInsets.all(11), child: SizedBox(width: 17, height: 17, child: CircularProgressIndicator(color: _primary, strokeWidth: 2)))
-          else if (canManage) ...[
-            SizedBox(
-              height: 28,
-              child: Switch.adaptive(
-                value: member.canSend,
-                onChanged: onPermissionChanged,
-                activeColor: _primary,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Member actions',
-              onSelected: (value) {
-                if (value == 'remove') onRemove();
-              },
-              itemBuilder: (_) => [
-                PopupMenuItem<String>(
-                  value: 'remove',
-                  enabled: !member.isCurrentUser,
-                  child: const Row(children: [Icon(Icons.person_remove_outlined, color: _danger, size: 18), SizedBox(width: 8), Text('Remove member')]),
-                ),
-              ],
-              icon: const Icon(Icons.more_vert_rounded, color: _muted, size: 19),
+        ),
+        PopupMenuButton<String>(
+          tooltip: 'Member actions',
+          onSelected: (value) {
+            if (value == 'remove') onRemove();
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem<String>(
+              value: 'remove',
+              enabled: !member.isCurrentUser,
+              child: const Row(children: [Icon(Icons.person_remove_outlined, color: _danger, size: 18), SizedBox(width: 8), Text('Remove member')]),
             ),
           ],
-        ]),
-      );
+          icon: const Icon(Icons.more_vert_rounded, color: _muted, size: 19),
+        ),
+      ],
+    ]),
+  );
 }
 
 class _AvailableEmployeeTile extends StatelessWidget {
@@ -548,32 +685,32 @@ class _ActionCard extends StatelessWidget {
   const _ActionCard({required this.icon, required this.label, required this.color, required this.onTap});
   @override
   Widget build(BuildContext context) => Material(
-        color: color.withOpacity(.07),
-        borderRadius: BorderRadius.circular(13),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(13),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 11),
-            child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 6),
-              Text(label, style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w700)),
-            ]),
-          ),
-        ),
-      );
+    color: color.withOpacity(.07),
+    borderRadius: BorderRadius.circular(13),
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w700)),
+        ]),
+      ),
+    ),
+  );
 }
 
 InputDecoration _dialogInput(String label, {bool counter = true}) => InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(fontSize: 11.5, color: _muted),
-      counterText: counter ? null : '',
-      filled: true,
-      fillColor: const Color(0xFFF8FAFD),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E7EF))),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E7EF))),
-    );
+  labelText: label,
+  labelStyle: const TextStyle(fontSize: 11.5, color: _muted),
+  counterText: counter ? null : '',
+  filled: true,
+  fillColor: const Color(0xFFF8FAFD),
+  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E7EF))),
+  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E7EF))),
+);
 
 class _InfoError extends StatelessWidget {
   final String message;
@@ -581,17 +718,17 @@ class _InfoError extends StatelessWidget {
   const _InfoError({required this.message, required this.onRetry});
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.cloud_off_rounded, size: 42, color: _muted),
-            const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 11.5)),
-            const SizedBox(height: 12),
-            FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 17), label: const Text('Try again')),
-          ]),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.cloud_off_rounded, size: 42, color: _muted),
+        const SizedBox(height: 10),
+        Text(message, textAlign: TextAlign.center, style: const TextStyle(color: _muted, fontSize: 11.5)),
+        const SizedBox(height: 12),
+        FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 17), label: const Text('Try again')),
+      ]),
+    ),
+  );
 }
 
 class _InlineError extends StatelessWidget {
@@ -600,14 +737,14 @@ class _InlineError extends StatelessWidget {
   const _InlineError({required this.message, required this.onClose});
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(top: 8),
-        padding: const EdgeInsets.fromLTRB(10, 7, 4, 7),
-        decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          const Icon(Icons.error_outline_rounded, color: _danger, size: 17),
-          const SizedBox(width: 7),
-          Expanded(child: Text(message, style: const TextStyle(color: Color(0xFFB42318), fontSize: 10.5))),
-          IconButton(onPressed: onClose, visualDensity: VisualDensity.compact, icon: const Icon(Icons.close_rounded, color: _danger, size: 16)),
-        ]),
-      );
+    margin: const EdgeInsets.only(top: 8),
+    padding: const EdgeInsets.fromLTRB(10, 7, 4, 7),
+    decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(12)),
+    child: Row(children: [
+      const Icon(Icons.error_outline_rounded, color: _danger, size: 17),
+      const SizedBox(width: 7),
+      Expanded(child: Text(message, style: const TextStyle(color: Color(0xFFB42318), fontSize: 10.5))),
+      IconButton(onPressed: onClose, visualDensity: VisualDensity.compact, icon: const Icon(Icons.close_rounded, color: _danger, size: 16)),
+    ]),
+  );
 }

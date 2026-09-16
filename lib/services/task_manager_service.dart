@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../model/employee_model.dart';
+import '../model/task_detail_model.dart';
 import '../model/task_model.dart';
 import 'api_endpoints.dart';
 import 'api_service.dart';
@@ -35,6 +36,41 @@ class TaskManagerService {
     }
   }
 
+  Future<CompanyProjectsResponseModel> getCompanyProjects({
+    String? search,
+    String? company,
+    int limit = 50,
+  }) async {
+    try {
+      final response = await _api.get(
+        url: ApiEndpoints.companyProjects,
+        queryParameters: {
+          if (search?.trim().isNotEmpty == true)
+            'search': search!.trim(),
+          if (company?.trim().isNotEmpty == true)
+            'company': company!.trim(),
+          'limit': limit.clamp(1, 200),
+        },
+      );
+
+      final result = CompanyProjectsResponseModel.fromJson(
+        _rootMap(response.data),
+      );
+
+      _ensureSuccess(
+        result.success,
+        result.message,
+        'Unable to fetch projects.',
+      );
+
+      return result;
+    } on DioException catch (error) {
+      throw Exception(
+        _dioMessage(error, 'Unable to fetch projects.'),
+      );
+    }
+  }
+
   Future<CompanyTasksResult> getCompanyTasks({
     String? status,
     String? project,
@@ -62,6 +98,37 @@ class TaskManagerService {
       return result;
     } on DioException catch (error) {
       throw Exception(_dioMessage(error, 'Unable to fetch company tasks.'));
+    }
+  }
+
+  Future<TaskDetailModel> getTaskDetails({
+    required String taskName,
+  }) async {
+    _requireText(taskName, 'Task name is required.');
+
+    try {
+      final response = await _api.get(
+        url: ApiEndpoints.taskDetails,
+        queryParameters: {
+          'task_name': taskName.trim(),
+        },
+      );
+
+      final result = TaskDetailModel.fromJson(
+        _rootMap(response.data),
+      );
+
+      _ensureSuccess(
+        result.success,
+        result.message,
+        'Unable to fetch task details.',
+      );
+
+      return result;
+    } on DioException catch (error) {
+      throw Exception(
+        _dioMessage(error, 'Unable to fetch task details.'),
+      );
     }
   }
 

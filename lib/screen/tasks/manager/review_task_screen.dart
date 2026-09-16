@@ -287,7 +287,19 @@ class _ReviewTaskScreenState extends State<ReviewTaskScreen> {
       child: Column(
         children: [
           if (_hasText(photoUrl))
-            _CompletionPhoto(url: photoUrl!)
+            _CompletionProof(
+              url: photoUrl!,
+              opening: viewModel.openingProof,
+              onOpen: () async {
+                final success = await viewModel.openProof(photoUrl);
+
+                if (!mounted || success) return;
+
+                _message(
+                  viewModel.errorMessage ?? 'Unable to open proof.',
+                );
+              },
+            )
           else
             const _MissingEvidence(
               icon: Icons.image_not_supported_outlined,
@@ -758,110 +770,145 @@ class _MetaLine extends StatelessWidget {
   }
 }
 
-class _CompletionPhoto extends StatelessWidget {
-  const _CompletionPhoto({required this.url});
+class _CompletionProof extends StatelessWidget {
+  const _CompletionProof({
+    required this.url,
+    required this.opening,
+    required this.onOpen,
+  });
 
   final String url;
+  final bool opening;
+  final VoidCallback onOpen;
 
-  void _open(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      barrierColor: Colors.black.withOpacity(.92),
-      builder: (dialogContext) => Dialog.fullscreen(
-        backgroundColor: Colors.transparent,
-        child: SafeArea(
-          child: Stack(
-            children: [
-              InteractiveViewer(
-                minScale: .8,
-                maxScale: 4,
-                child: Center(child: Image.network(url, fit: BoxFit.contain)),
-              ),
-              Positioned(
-                top: 6,
-                right: 6,
-                child: IconButton.filled(
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(.16),
-                  ),
-                  onPressed: () => Navigator.pop(dialogContext),
-                  icon: const Icon(Icons.close_rounded, color: Colors.white),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  bool get isImage {
+    final cleanUrl = Uri.tryParse(url)?.path.toLowerCase() ??
+        url.toLowerCase();
+
+    return cleanUrl.endsWith('.jpg') ||
+        cleanUrl.endsWith('.jpeg') ||
+        cleanUrl.endsWith('.png') ||
+        cleanUrl.endsWith('.webp');
+  }
+
+  String get fileName {
+    final uri = Uri.tryParse(url);
+
+    if (uri != null && uri.pathSegments.isNotEmpty) {
+      return Uri.decodeComponent(uri.pathSegments.last);
+    }
+
+    return 'Completion proof';
   }
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(13),
-      onTap: () => _open(context),
-      child: ClipRRect(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
         borderRadius: BorderRadius.circular(13),
-        child: Stack(
-          children: [
-            Image.network(
-              url,
-              height: 190,
-              width: double.infinity,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, progress) {
-                if (progress == null) return child;
-                return Container(
-                  height: 190,
-                  color: const Color(0xFFF0F3F8),
-                  alignment: Alignment.center,
-                  child: const CircularProgressIndicator(strokeWidth: 2),
-                );
-              },
-              errorBuilder: (_, __, ___) => Container(
-                height: 120,
-                color: const Color(0xFFF7F8FB),
-                alignment: Alignment.center,
-                child: const Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.broken_image_outlined, color: _muted),
-                    SizedBox(height: 5),
-                    Text(
-                      'Unable to display proof photo',
-                      style: TextStyle(color: _muted, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              right: 8,
-              bottom: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(.62),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.zoom_in_rounded, color: Colors.white, size: 15),
-                    SizedBox(width: 4),
-                    Text(
-                      'View proof',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
+        border: Border.all(
+          color: const Color(0xFFE3E8F0),
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (isImage)
+            ClipRRect(
+              borderRadius: BorderRadius.circular(11),
+              child: Image.network(
+                url,
+                height: 180,
+                width: double.infinity,
+                fit: BoxFit.cover,
+                loadingBuilder: (_, child, progress) {
+                  if (progress == null) return child;
+
+                  return Container(
+                    height: 180,
+                    color: const Color(0xFFF0F3F8),
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 2,
+                    ),
+                  );
+                },
+                errorBuilder: (_, __, ___) => Container(
+                  height: 90,
+                  color: const Color(0xFFF2F4F7),
+                  alignment: Alignment.center,
+                  child: const Text(
+                    'Use Open proof to view this private image',
+                    style: TextStyle(
+                      color: _muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: _primary.withOpacity(.08),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: const Icon(
+                    Icons.description_outlined,
+                    color: _primary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    fileName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _ink,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          if (isImage) const SizedBox(height: 9),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: opening ? null : onOpen,
+              icon: opening
+                  ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                ),
+              )
+                  : Icon(
+                isImage
+                    ? Icons.open_in_full_rounded
+                    : Icons.open_in_new_rounded,
+                size: 18,
+              ),
+              label: Text(
+                opening
+                    ? 'Opening...'
+                    : isImage
+                    ? 'Open full image'
+                    : 'Open proof file',
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

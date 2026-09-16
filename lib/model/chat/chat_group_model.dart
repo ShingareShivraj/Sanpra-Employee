@@ -16,6 +16,7 @@ class ChatGroupModel {
   final String name;
   final String groupName;
   final String? description;
+  final String? groupImage;
   final String? createdBy;
   final bool isActive;
   final bool canSend;
@@ -32,6 +33,7 @@ class ChatGroupModel {
     required this.name,
     required this.groupName,
     this.description,
+    this.groupImage,
     this.createdBy,
     required this.isActive,
     required this.canSend,
@@ -57,6 +59,7 @@ class ChatGroupModel {
       name: _string(json['name']),
       groupName: _string(json['group_name'], fallback: _string(json['name'])),
       description: _optional(json['description']),
+      groupImage: _optional(json['group_image']),
       createdBy: _optional(json['created_by']),
       isActive: json.containsKey('is_active') ? _bool(json['is_active']) : true,
       canSend: _bool(json['can_send']),
@@ -85,6 +88,7 @@ class ChatGroupModel {
         name: name,
         groupName: groupName,
         description: description,
+        groupImage: groupImage,
         createdBy: createdBy,
         isActive: isActive ?? this.isActive,
         canSend: canSend ?? this.canSend,

@@ -4,6 +4,7 @@ import '../../model/chat/chat_group_model.dart';
 import '../../model/chat/chat_message_model.dart';
 import 'chat_conversation_screen.dart';
 import 'chat_viewmodel.dart';
+import 'manager/group_info_screen.dart';
 
 const _primary = Color(0xFF1B5FE0);
 const _darkBlue = Color(0xFF123FA0);
@@ -14,6 +15,10 @@ const _muted = Color(0xFF718096);
 class ChatScreen extends StatefulWidget {
   final Stream<Map<String, dynamic>>? messageEvents;
   final Stream<Map<String, dynamic>>? deletedMessageEvents;
+  final Stream<Map<String, dynamic>>? updatedMessageEvents;
+  final Stream<Map<String, dynamic>>? reactionEvents;
+  final Stream<Map<String, dynamic>>? typingEvents;
+  final Stream<Map<String, dynamic>>? presenceEvents;
   final Future<void> Function()? onOpenManager;
   final Future<void> Function(String group)? onOpenGroupInfo;
   final Future<void> Function(ChatMessageModel message)? onOpenAttachment;
@@ -22,6 +27,10 @@ class ChatScreen extends StatefulWidget {
     super.key,
     this.messageEvents,
     this.deletedMessageEvents,
+    this.updatedMessageEvents,
+    this.reactionEvents,
+    this.typingEvents,
+    this.presenceEvents,
     this.onOpenManager,
     this.onOpenGroupInfo,
     this.onOpenAttachment,
@@ -39,7 +48,11 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _viewModel = ChatViewModel(messageEvents: widget.messageEvents)..initialise();
+    _viewModel = ChatViewModel(
+      messageEvents: widget.messageEvents,
+      updatedMessageEvents: widget.updatedMessageEvents,
+      deletedMessageEvents: widget.deletedMessageEvents,
+    )..initialise();
   }
 
   @override
@@ -57,12 +70,30 @@ class _ChatScreenState extends State<ChatScreen> {
           initialGroup: group,
           messageEvents: widget.messageEvents,
           deletedMessageEvents: widget.deletedMessageEvents,
-          onOpenGroupInfo: widget.onOpenGroupInfo,
+          updatedMessageEvents: widget.updatedMessageEvents,
+          reactionEvents: widget.reactionEvents,
+          typingEvents: widget.typingEvents,
+          presenceEvents: widget.presenceEvents,
+          onOpenGroupInfo: _openGroupInfo,
           onOpenAttachment: widget.onOpenAttachment,
         ),
       ),
     );
     await _viewModel.refresh();
+  }
+  Future<void> _openGroupInfo(String groupName) async {
+    if (widget.onOpenGroupInfo != null) {
+      await widget.onOpenGroupInfo!(groupName);
+      return;
+    }
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GroupInfoScreen(
+          groupName: groupName,
+        ),
+      ),
+    );
   }
 
   Future<void> _openManager() async {
@@ -105,16 +136,16 @@ class _ChatScreenState extends State<ChatScreen> {
           appBar: _buildAppBar(),
           floatingActionButton: _viewModel.isChatManager
               ? FloatingActionButton.extended(
-                  onPressed: _openManager,
-                  backgroundColor: _primary,
-                  foregroundColor: Colors.white,
-                  elevation: 3,
-                  icon: const Icon(Icons.group_add_rounded, size: 20),
-                  label: const Text(
-                    'Manage groups',
-                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
-                  ),
-                )
+            onPressed: _openManager,
+            backgroundColor: _primary,
+            foregroundColor: Colors.white,
+            elevation: 3,
+            icon: const Icon(Icons.group_add_rounded, size: 20),
+            label: const Text(
+              'Manage groups',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+            ),
+          )
               : null,
           body: _buildBody(),
         );
@@ -130,38 +161,38 @@ class _ChatScreenState extends State<ChatScreen> {
       titleSpacing: 16,
       title: _searching
           ? TextField(
-              controller: _searchController,
-              autofocus: true,
-              onChanged: _viewModel.search,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-              cursorColor: Colors.white,
-              decoration: const InputDecoration(
-                hintText: 'Search conversations',
-                hintStyle: TextStyle(color: Color(0xFFCFDDFF), fontSize: 13),
-                border: InputBorder.none,
-              ),
-            )
+        controller: _searchController,
+        autofocus: true,
+        onChanged: _viewModel.search,
+        style: const TextStyle(color: Colors.white, fontSize: 14),
+        cursorColor: Colors.white,
+        decoration: const InputDecoration(
+          hintText: 'Search conversations',
+          hintStyle: TextStyle(color: Color(0xFFCFDDFF), fontSize: 13),
+          border: InputBorder.none,
+        ),
+      )
           : Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(.14),
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: const Icon(Icons.forum_rounded, size: 20),
-                ),
-                const SizedBox(width: 10),
-                const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Team Chat', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-                    Text('Stay connected at work', style: TextStyle(fontSize: 10.5, color: Color(0xFFD7E3FF))),
-                  ],
-                ),
-              ],
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(.14),
+              borderRadius: BorderRadius.circular(11),
             ),
+            child: const Icon(Icons.forum_rounded, size: 20),
+          ),
+          const SizedBox(width: 10),
+          const Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Team Chat', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              Text('Stay connected at work', style: TextStyle(fontSize: 10.5, color: Color(0xFFD7E3FF))),
+            ],
+          ),
+        ],
+      ),
       actions: [
         if (!_searching && _viewModel.totalUnread > 0)
           Center(
@@ -357,29 +388,29 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(color: const Color(0xFFE8EFFF), borderRadius: BorderRadius.circular(22)),
-                child: const Icon(Icons.forum_outlined, color: _primary, size: 34),
-              ),
-              const SizedBox(height: 14),
-              Text(searching ? 'No matching chats' : 'No chats yet', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _text)),
-              const SizedBox(height: 5),
-              Text(
-                searching ? 'Try a different group name.' : 'Your employee groups will appear here.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 12, color: _muted),
-              ),
-            ],
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(color: const Color(0xFFE8EFFF), borderRadius: BorderRadius.circular(22)),
+            child: const Icon(Icons.forum_outlined, color: _primary, size: 34),
           ),
-        ),
-      );
+          const SizedBox(height: 14),
+          Text(searching ? 'No matching chats' : 'No chats yet', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: _text)),
+          const SizedBox(height: 5),
+          Text(
+            searching ? 'Try a different group name.' : 'Your employee groups will appear here.',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, color: _muted),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ErrorState extends StatelessWidget {
@@ -389,20 +420,20 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.cloud_off_rounded, size: 42, color: _muted),
-              const SizedBox(height: 10),
-              Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: _muted)),
-              const SizedBox(height: 14),
-              FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('Try again')),
-            ],
-          ),
-        ),
-      );
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.cloud_off_rounded, size: 42, color: _muted),
+          const SizedBox(height: 10),
+          Text(message, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: _muted)),
+          const SizedBox(height: 14),
+          FilledButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded, size: 18), label: const Text('Try again')),
+        ],
+      ),
+    ),
+  );
 }
 
 class _InlineError extends StatelessWidget {
@@ -411,15 +442,15 @@ class _InlineError extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(12)),
-        child: Row(children: [
-          const Icon(Icons.error_outline_rounded, color: Color(0xFFD92D20), size: 18),
-          const SizedBox(width: 8),
-          Expanded(child: Text(message, style: const TextStyle(color: Color(0xFFB42318), fontSize: 11.5))),
-        ]),
-      );
+    margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(color: const Color(0xFFFFF0F0), borderRadius: BorderRadius.circular(12)),
+    child: Row(children: [
+      const Icon(Icons.error_outline_rounded, color: Color(0xFFD92D20), size: 18),
+      const SizedBox(width: 8),
+      Expanded(child: Text(message, style: const TextStyle(color: Color(0xFFB42318), fontSize: 11.5))),
+    ]),
+  );
 }
 
 String _friendlyTime(DateTime? date) {

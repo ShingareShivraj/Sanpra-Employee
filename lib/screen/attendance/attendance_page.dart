@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../model/attendance_calendar_model.dart';
 import 'attendance_viewmodel.dart';
 
 const _primary = Color(0xFF1B5FE0);
@@ -29,9 +30,10 @@ class _AttendancePageState extends State<AttendancePage> {
   void initState() {
     super.initState();
     _viewModel = AttendanceViewModel();
-    _selectedMonth = DateTime(_financialYearStart, 4);
+    _selectedMonth = DateTime.now();
     _viewModel.addListener(_onViewModelChanged);
     _loadAttendance();
+    _viewModel.loadShiftInfo();
   }
 
   @override
@@ -136,6 +138,8 @@ class _AttendancePageState extends State<AttendancePage> {
           _buildHero(),
           const SizedBox(height: 14),
           _buildSummary(),
+          const SizedBox(height: 16),
+          _buildShiftCard(),
           const SizedBox(height: 18),
           _sectionTitle('Monthly calendar', 'Tap any date for details'),
           const SizedBox(height: 10),
@@ -274,6 +278,587 @@ class _AttendancePageState extends State<AttendancePage> {
         ],
       ),
     );
+  }
+
+  Widget _buildShiftCard() {
+    if (_viewModel.isShiftLoading && !_viewModel.hasShiftData) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFFE4EAF3),
+          ),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: _primary,
+              ),
+            ),
+            SizedBox(width: 12),
+            Text(
+              'Loading shift information...',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF77839A),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!_viewModel.hasShiftData) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: const Color(0xFFE4EAF3),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: _primary.withValues(alpha: .09),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.schedule_rounded,
+                color: _primary,
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'No default shift is assigned to you.',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF5F6C83),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final shift = _viewModel.shiftData!.shift!;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFEAF2FF),
+            Colors.white,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: const Color(0xFFD9E6FA),
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A17233D),
+            blurRadius: 14,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: _primary.withValues(alpha: .10),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(
+                  Icons.schedule_rounded,
+                  color: _primary,
+                  size: 25,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'My Shift',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF77839A),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      shift.name,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF17233D),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Shift details',
+                onPressed: _showShiftDetails,
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: _primary,
+                ),
+                icon: const Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 16,
+                ),
+              ),
+            ],
+          ),
+          // const SizedBox(height: 14),
+          // Container(
+          //   padding: const EdgeInsets.symmetric(
+          //     horizontal: 13,
+          //     vertical: 11,
+          //   ),
+          //   decoration: BoxDecoration(
+          //     color: Colors.white.withValues(alpha: .8),
+          //     borderRadius: BorderRadius.circular(14),
+          //   ),
+          //   child: Row(
+          //     children: [
+          //       const Icon(
+          //         Icons.access_time_rounded,
+          //         size: 18,
+          //         color: _primary,
+          //       ),
+          //       const SizedBox(width: 8),
+          //       Expanded(
+          //         child: Text(
+          //           '${_formatShiftTime(shift.startTime)}'
+          //               '  —  '
+          //               '${_formatShiftTime(shift.endTime)}',
+          //           style: const TextStyle(
+          //             fontSize: 14,
+          //             fontWeight: FontWeight.w700,
+          //             color: Color(0xFF27344D),
+          //           ),
+          //         ),
+          //       ),
+          //       TextButton(
+          //         onPressed: _showShiftDetails,
+          //         child: const Text('View details'),
+          //       ),
+          //     ],
+          //   ),
+          // ),
+        ],
+      ),
+    );
+  }
+
+  void _showShiftDetails() {
+    final shift = _viewModel.shiftData?.shift;
+
+    if (shift == null) {
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * .82,
+            ),
+            margin: const EdgeInsets.all(10),
+            padding: const EdgeInsets.fromLTRB(18, 10, 18, 20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD7DEEA),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  Row(
+                    children: [
+                      Container(
+                        width: 54,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: _primary.withValues(alpha: .10),
+                          borderRadius: BorderRadius.circular(17),
+                        ),
+                        child: const Icon(
+                          Icons.schedule_rounded,
+                          color: _primary,
+                          size: 28,
+                        ),
+                      ),
+
+                      const SizedBox(width: 14),
+
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'My Shift',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF77839A),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              shift.name,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF17233D),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      IconButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        style: IconButton.styleFrom(
+                          backgroundColor: const Color(0xFFF2F5F9),
+                        ),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  _shiftTimeCard(shift),
+
+                  const SizedBox(height: 12),
+
+                  _shiftDetailRow(
+                    Icons.event_available_rounded,
+                    'Holiday List',
+                    shift.holidayList ?? 'Not assigned',
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _shiftDetailRow(
+                    Icons.timelapse_rounded,
+                    'Half Day Threshold',
+                    '${shift.halfDayThreshold} hours',
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _shiftDetailRow(
+                    Icons.person_off_rounded,
+                    'Absent Threshold',
+                    '${shift.absentThreshold} hours',
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Attendance Settings',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF17233D),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  _shiftSettingRow(
+                    Icons.login_rounded,
+                    'Check-in before shift',
+                    _formatSettingValue(
+                      shift.beginCheckInBeforeShiftStartTime,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  _shiftSettingRow(
+                    Icons.logout_rounded,
+                    'Check-out after shift',
+                    _formatSettingValue(
+                      shift.allowCheckOutAfterShiftEndTime,
+                    ),
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  _shiftSettingRow(
+                    Icons.auto_awesome_rounded,
+                    'Auto Attendance',
+                    shift.enableAutoAttendance
+                        ? 'Enabled'
+                        : 'Disabled',
+                  ),
+
+                  const SizedBox(height: 8),
+
+                  _shiftSettingRow(
+                    Icons.sync_alt_rounded,
+                    'Auto Check-in / Check-out',
+                    shift.determineCheckInAndCheckOut
+                        ? 'Enabled'
+                        : 'Disabled',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _shiftTimeCard(ShiftInfo shift) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF4F7FC),
+        borderRadius: BorderRadius.circular(17),
+        border: Border.all(
+          color: const Color(0xFFE3E9F2),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'START TIME',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: .7,
+                    color: Color(0xFF8A95A8),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatShiftTime(shift.startTime),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF17233D),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 38,
+            color: const Color(0xFFDDE3EC),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'END TIME',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .7,
+                      color: Color(0xFF8A95A8),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatShiftTime(shift.endTime),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF17233D),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shiftDetailRow(
+      IconData icon,
+      String title,
+      String value,
+      ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: const Color(0xFFE7ECF4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _primary.withValues(alpha: .09),
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              icon,
+              size: 19,
+              color: _primary,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF77839A),
+              ),
+            ),
+          ),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF27344D),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+  Widget _shiftSettingRow(
+      IconData icon,
+      String title,
+      String value,
+      ) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 11,
+      ),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFD),
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            icon,
+            size: 18,
+            color: _primary,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF5F6C83),
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF27344D),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatSettingValue(dynamic value) {
+    if (value == null) {
+      return 'Not configured';
+    }
+
+    if (value is bool) {
+      return value ? 'Enabled' : 'Disabled';
+    }
+
+    if (value is num) {
+      return value == 1 ? 'Enabled' : 'Disabled';
+    }
+
+    final text = value.toString().trim();
+
+    if (text.isEmpty || text == '0') {
+      return 'Disabled';
+    }
+
+    return text;
   }
 
   Widget _buildCalendarCard() {
@@ -444,8 +1029,16 @@ class _AttendancePageState extends State<AttendancePage> {
     ],
   );
 
-  void _showDayDetails({required DateTime date, required String? status, required String? holidayName}) {
-    final attendanceStatus = _viewModel.getAttendanceStatusForDate(_formatDate(date));
+  void _showDayDetails({
+    required DateTime date,
+    required String? status,
+    required String? holidayName,
+  }) {
+    final dateString = _formatDate(date);
+    final attendanceStatus =
+    _viewModel.getAttendanceStatusForDate(dateString);
+    final attendanceDetail =
+    _viewModel.getAttendanceDetailForDate(dateString);
     final color = _getStatusColor(status);
     showModalBottomSheet(
       context: context,
@@ -485,11 +1078,70 @@ class _AttendancePageState extends State<AttendancePage> {
               ),
               const SizedBox(height: 18),
               _detailRow(
-                status == 'HOLIDAY' ? Icons.celebration_rounded : status == null ? Icons.info_outline_rounded : Icons.fact_check_rounded,
-                status == 'HOLIDAY' ? 'Holiday' : 'Attendance status',
-                status == 'HOLIDAY' ? (holidayName ?? 'Holiday') : attendanceStatus != null ? _statusLabel(attendanceStatus) : 'No record available',
+                status == 'HOLIDAY'
+                    ? Icons.celebration_rounded
+                    : status == null
+                    ? Icons.info_outline_rounded
+                    : Icons.fact_check_rounded,
+                status == 'HOLIDAY'
+                    ? 'Holiday'
+                    : 'Attendance status',
+                status == 'HOLIDAY'
+                    ? (holidayName ?? 'Holiday')
+                    : attendanceStatus != null
+                    ? _statusLabel(attendanceStatus)
+                    : 'No record available',
                 color,
               ),
+
+              if (status != 'HOLIDAY' &&
+                  attendanceDetail != null) ...[
+                const SizedBox(height: 10),
+                _detailRow(
+                  Icons.work_history_rounded,
+                  'Shift Type',
+                  attendanceDetail.shiftType ?? '--',
+                  color,
+                ),
+                const SizedBox(height: 10),
+
+                _detailRow(
+                  Icons.login_rounded,
+                  'Check In',
+                  _formatTime(attendanceDetail.checkIn),
+                  color,
+                ),
+
+                const SizedBox(height: 10),
+
+                _detailRow(
+                  Icons.logout_rounded,
+                  'Check Out',
+                  _formatTime(attendanceDetail.checkOut),
+                  color,
+                ),
+
+                const SizedBox(height: 10),
+
+                _detailRow(
+                  Icons.schedule_rounded,
+                  'Working Hours',
+                  _formatWorkingHours(
+                    attendanceDetail.workingHours,
+                  ),
+                  color,
+                ),
+
+                if (attendanceDetail.lateEntry) ...[
+                  const SizedBox(height: 10),
+                  _detailRow(
+                    Icons.warning_amber_rounded,
+                    'Late Mark',
+                    'Late',
+                    _absent,
+                  ),
+                ],
+              ],
               if (status == null) ...[
                 const SizedBox(height: 10),
                 const Text('No attendance or holiday record is available for this date.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, height: 1.45, color: Color(0xFF77839A))),
@@ -499,6 +1151,76 @@ class _AttendancePageState extends State<AttendancePage> {
         ),
       ),
     );
+  }
+
+  String _formatShiftTime(String? time) {
+    if (time == null || time.isEmpty) {
+      return '--';
+    }
+
+    final parts = time.split(':');
+
+    if (parts.length < 2) {
+      return time;
+    }
+
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+
+    if (hour == null || minute == null) {
+      return time;
+    }
+
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+
+    return '${displayHour.toString().padLeft(2, '0')}:'
+        '${minute.toString().padLeft(2, '0')} $period';
+  }
+
+  String _formatTime(String? time) {
+    if (time == null || time.isEmpty) {
+      return '--';
+    }
+
+    final dateTime = DateTime.tryParse(time);
+
+    if (dateTime != null) {
+      final hour = dateTime.hour;
+      final minute = dateTime.minute;
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+
+      return '${displayHour.toString().padLeft(2, '0')}:'
+          '${minute.toString().padLeft(2, '0')} $period';
+    }
+
+    final parts = time.split(':');
+
+    if (parts.length < 2) {
+      return time;
+    }
+
+    final hour = int.tryParse(parts[0].split(' ').last);
+    final minute = int.tryParse(parts[1]);
+
+    if (hour == null || minute == null) {
+      return time;
+    }
+
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+
+    return '${displayHour.toString().padLeft(2, '0')}:'
+        '${minute.toString().padLeft(2, '0')} $period';
+  }
+
+  String _formatWorkingHours(double hours) {
+    final totalMinutes = (hours * 60).round();
+    final hour = totalMinutes ~/ 60;
+    final minute = totalMinutes % 60;
+
+    return '${hour}h ${minute}m';
   }
 
   IconData _statusIcon(String? status) {

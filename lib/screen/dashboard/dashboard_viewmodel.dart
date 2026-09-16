@@ -2,62 +2,62 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 
-import '../../model/attendance_responce.dart';
 import '../../model/attendance_status_model.dart';
+import '../../model/task_model.dart';
 import '../../services/attendance_service.dart';
 import '../../services/location_service.dart';
 import '../../services/login_service.dart';
 import '../../services/task_service.dart';
-import '../../model/task_model.dart';
+import '../../model/my_work_model.dart';
+import '../../services/my_work_service.dart';
 
 class DashboardViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final AttendanceService _attendanceService = AttendanceService();
   final LocationService _locationService = LocationService();
-  final TaskService _taskService = TaskService();
+  final MyWorkService _myWorkService = MyWorkService();
 
-  String attendanceStatus = "Not Checked In";
-  String checkInTime = "";
+  String attendanceStatus = 'Not Checked In';
 
+  String checkInTime = '';
+  String checkOutTime = '';
+
+  DateTime? checkInDateTime;
+  DateTime? checkOutDateTime;
   bool _attendanceLoading = false;
   bool get attendanceLoading => _attendanceLoading;
 
   bool _loading = true;
   bool get loading => _loading;
 
-  String employeeName = "";
-  String designation = "";
-  String department = "";
-  String company = "";
-  String email = "";
-  // ============================================================
-// TASK PERMISSIONS
-// ============================================================
+  String employeeName = '';
+  String designation = '';
+  String department = '';
+  String company = '';
+  String email = '';
+
   bool isChatManager = false;
   bool isTaskManager = false;
-
   bool canCreateTask = false;
-
   bool canAssignTask = false;
-
   bool canReviewTask = false;
   bool isIssueManager = false;
 
-  // Dashboard tasks from get_dashboard_tasks API
-  int todayTaskCount = 0;
-  List<TaskModel> todayTasks = [];
+  int dashboardWorkCount = 0;
+  MyWorkCountsModel workCounts = const MyWorkCountsModel();
+  List<MyWorkItemModel> dashboardWork = [];
 
-
-
-  Future<void> loadDashboardTasks() async {
+  Future<void> loadDashboardWork() async {
     try {
-      final response = await _taskService.getDashboardTasks();
+      final response = await _myWorkService.getDashboardWork(limit: 5);
 
-      todayTaskCount = response.taskCount;
-      todayTasks = response.tasks;
+      dashboardWorkCount = response.workCount;
+      workCounts = response.counts;
+      dashboardWork = response.work;
     } catch (_) {
-      todayTaskCount = 0;
-      todayTasks = [];
+      dashboardWorkCount = 0;
+      workCounts = const MyWorkCountsModel();
+      dashboardWork = [];
     }
 
     notifyListeners();
@@ -70,17 +70,32 @@ class DashboardViewModel extends ChangeNotifier {
 
       attendanceStatus = response.status;
 
+      // Keep the original DateTime from the API.
       if (response.checkInTime.isNotEmpty) {
-        final DateTime date = DateTime.parse(response.checkInTime);
+        checkInDateTime = DateTime.parse(response.checkInTime);
 
-        checkInTime = DateFormat("hh:mm a").format(date);
+        // Keep formatted time for displaying in the UI.
+        checkInTime = DateFormat('hh:mm a').format(checkInDateTime!);
       } else {
-        checkInTime = "";
+        checkInDateTime = null;
+        checkInTime = '';
+      }
+
+      // Keep the original checkout DateTime from the API.
+      if (response.checkOutTime.isNotEmpty) {
+        checkOutDateTime = DateTime.parse(response.checkOutTime);
+
+        // Keep formatted time for displaying in the UI.
+        checkOutTime =
+            DateFormat('hh:mm a').format(checkOutDateTime!);
+      } else {
+        checkOutDateTime = null;
+        checkOutTime = '';
       }
 
       notifyListeners();
     } catch (_) {
-      // Keep the existing/default attendance status.
+      // Keep the last known/default attendance state.
     }
   }
 
@@ -89,36 +104,21 @@ class DashboardViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      employeeName = await _authService.getEmployeeName() ?? "";
-      designation = await _authService.getDesignation() ?? "";
-      department = await _authService.getDepartment() ?? "";
-      company = await _authService.getCompany() ?? "";
-      email = await _authService.getEmail() ?? "";
-      // ============================================================
-// TASK PERMISSIONS
-// ============================================================
-      isChatManager =
-      await _authService.hasRole("Chat Manager");
-
-      isTaskManager =
-      await _authService.getIsTaskManager();
-
-      canCreateTask =
-      await _authService.getCanCreateTask();
-
-      canAssignTask =
-      await _authService.getCanAssignTask();
-
-      canReviewTask =
-      await _authService.getCanReviewTask();
-
-
-      isIssueManager =
-      await _authService.hasRole("Issue Manager");
+      employeeName = await _authService.getEmployeeName() ?? '';
+      designation = await _authService.getDesignation() ?? '';
+      department = await _authService.getDepartment() ?? '';
+      company = await _authService.getCompany() ?? '';
+      email = await _authService.getEmail() ?? '';
+      isChatManager = await _authService.hasRole('Chat Manager');
+      isTaskManager = await _authService.getIsTaskManager();
+      canCreateTask = await _authService.getCanCreateTask();
+      canAssignTask = await _authService.getCanAssignTask();
+      canReviewTask = await _authService.getCanReviewTask();
+      isIssueManager = await _authService.hasRole('Issue Manager');
 
       await Future.wait([
         loadAttendanceStatus(),
-        loadDashboardTasks(),
+        loadDashboardWork(),
       ]);
     } finally {
       _loading = false;
@@ -130,15 +130,11 @@ class DashboardViewModel extends ChangeNotifier {
     try {
       _attendanceLoading = true;
       notifyListeners();
-
-      final Position position =
-      await _locationService.getCurrentLocation();
-
+      final Position position = await _locationService.getCurrentLocation();
       await _attendanceService.checkIn(
         latitude: position.latitude,
         longitude: position.longitude,
       );
-
       await loadAttendanceStatus();
     } catch (_) {
       rethrow;
@@ -152,15 +148,11 @@ class DashboardViewModel extends ChangeNotifier {
     try {
       _attendanceLoading = true;
       notifyListeners();
-
-      final Position position =
-      await _locationService.getCurrentLocation();
-
+      final Position position = await _locationService.getCurrentLocation();
       await _attendanceService.checkOut(
         latitude: position.latitude,
         longitude: position.longitude,
       );
-
       await loadAttendanceStatus();
     } catch (_) {
       rethrow;

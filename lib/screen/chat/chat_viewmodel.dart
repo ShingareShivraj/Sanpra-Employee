@@ -8,13 +8,21 @@ import '../../services/chat_service.dart';
 class ChatViewModel extends ChangeNotifier {
   final ChatService _service;
   final Stream<Map<String, dynamic>>? _messageEvents;
+  final Stream<Map<String, dynamic>>? _updatedMessageEvents;
+  final Stream<Map<String, dynamic>>? _deletedMessageEvents;
   StreamSubscription<Map<String, dynamic>>? _messageSubscription;
+  StreamSubscription<Map<String, dynamic>>? _updatedMessageSubscription;
+  StreamSubscription<Map<String, dynamic>>? _deletedMessageSubscription;
 
   ChatViewModel({
     ChatService? service,
     Stream<Map<String, dynamic>>? messageEvents,
+    Stream<Map<String, dynamic>>? updatedMessageEvents,
+    Stream<Map<String, dynamic>>? deletedMessageEvents,
   })  : _service = service ?? ChatService(),
-        _messageEvents = messageEvents;
+        _messageEvents = messageEvents,
+        _updatedMessageEvents = updatedMessageEvents,
+        _deletedMessageEvents = deletedMessageEvents;
 
   final List<ChatGroupModel> _groups = [];
   String _query = '';
@@ -103,8 +111,30 @@ class ChatViewModel extends ChangeNotifier {
   }
 
   void _listenRealtime() {
-    if (_messageEvents == null || _messageSubscription != null) return;
-    _messageSubscription = _messageEvents.listen(handleRealtimeMessage);
+    _messageSubscription ??= _messageEvents?.listen(handleRealtimeMessage);
+    _updatedMessageSubscription ??=
+        _updatedMessageEvents?.listen(handleRealtimeMessageChanged);
+    _deletedMessageSubscription ??=
+        _deletedMessageEvents?.listen(handleRealtimeMessageChanged);
+  }
+
+  void handleRealtimeMessageChanged(Map<String, dynamic> event) {
+    final groupName = event['group']?.toString() ?? '';
+    if (groupName.isEmpty ||
+        !_groups.any((group) => group.name == groupName)) {
+      return;
+    }
+    unawaited(_refreshFromRealtime());
+  }
+
+  Future<void> _refreshFromRealtime() async {
+    try {
+      _replaceGroups(await _service.getMyGroups());
+      notifyListeners();
+    } catch (error) {
+      _error = _cleanError(error);
+      notifyListeners();
+    }
   }
 
   void handleRealtimeMessage(Map<String, dynamic> event) {
@@ -153,6 +183,8 @@ class ChatViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _messageSubscription?.cancel();
+    _updatedMessageSubscription?.cancel();
+    _deletedMessageSubscription?.cancel();
     super.dispose();
   }
 }

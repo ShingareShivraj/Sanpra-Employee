@@ -8,9 +8,14 @@ class CreateTaskViewModel extends ChangeNotifier {
   CreateTaskViewModel({TaskManagerService? service}) : _service = service ?? TaskManagerService();
   final TaskManagerService _service;
   List<EmployeeModel> employees = const [];
+  List<ProjectModel> projects = const [];
+  ProjectModel? selectedProject;
+
   final Set<String> selectedUsers = {};
   String priority = 'Medium';
   DateTime? startDate, endDate;
+  bool loadingProjects = false;
+
   String? company, errorMessage;
   bool loadingEmployees = false, submitting = false;
   bool _disposed = false;
@@ -26,6 +31,37 @@ class CreateTaskViewModel extends ChangeNotifier {
     finally { loadingEmployees = false; _notify(); }
   }
 
+
+  Future<void> loadProjects({String? search}) async {
+    if (loadingProjects) return;
+
+    loadingProjects = true;
+    errorMessage = null;
+    _notify();
+
+    try {
+      final result = await _service.getCompanyProjects(
+        search: search,
+        limit: 200,
+      );
+
+      projects = result.projects;
+
+      // Keep the company returned by the backend.
+      company ??= result.company;
+    } catch (error) {
+      errorMessage = _cleanError(error);
+    } finally {
+      loadingProjects = false;
+      _notify();
+    }
+  }
+
+  void setProject(ProjectModel? project) {
+    selectedProject = project;
+    _notify();
+  }
+
   void setPriority(String? value) { if (value != null) { priority = value; _notify(); } }
   void setStartDate(DateTime? value) { startDate = value; if (endDate != null && value != null && endDate!.isBefore(value)) endDate = null; _notify(); }
   void setEndDate(DateTime? value) { endDate = value; _notify(); }
@@ -39,7 +75,10 @@ class CreateTaskViewModel extends ChangeNotifier {
     return null;
   }
 
-  Future<TaskModel?> create({required String subject, String? description, String? project}) async {
+  Future<TaskModel?> create({
+    required String subject,
+    String? description,
+  }) async {
     final validation = validate(subject: subject);
     if (validation != null) { errorMessage = validation; _notify(); return null; }
     if (submitting) return null;
@@ -48,7 +87,7 @@ class CreateTaskViewModel extends ChangeNotifier {
       return await _service.createTask(
         subject: subject, description: description, priority: priority,
         expectedStartDate: startDate, expectedEndDate: endDate,
-        project: project, assignedUsers: selectedUsers.toList(), company: company,
+        project: selectedProject?.name, assignedUsers: selectedUsers.toList(), company: company,
       );
     } catch (error) { errorMessage = _cleanError(error); return null; }
     finally { submitting = false; _notify(); }

@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import '../model/chat/chat_group_model.dart';
 import '../model/chat/chat_member_model.dart';
 import '../model/chat/chat_message_model.dart';
+import '../model/chat/chat_reaction_model.dart';
 import 'api_endpoints.dart';
 import 'api_service.dart';
 
@@ -70,6 +71,9 @@ class ChatService {
     String? message,
     ChatMessageType messageType = ChatMessageType.text,
     String? attachment,
+    String? replyTo,
+    String? forwardedFrom,
+    List<ChatMentionModel> mentions = const [],
   }) async {
     _required(group, 'Chat group is required.');
     if (messageType == ChatMessageType.text) {
@@ -84,6 +88,11 @@ class ChatService {
         'message': message?.trim() ?? '',
         'message_type': _messageType(messageType),
         if (attachment?.trim().isNotEmpty == true) 'attachment': attachment!.trim(),
+        if (replyTo?.trim().isNotEmpty == true) 'reply_to': replyTo!.trim(),
+        if (forwardedFrom?.trim().isNotEmpty == true)
+          'forwarded_from': forwardedFrom!.trim(),
+        if (mentions.isNotEmpty)
+          'mentions': mentions.map((mention) => mention.toJson()).toList(),
       },
     );
     return ChatMessageModel.fromJson(data);
@@ -168,15 +177,32 @@ class ChatService {
     required String groupName,
     String? description,
     required List<ChatMemberInput> members,
+    File? groupImage,
   }) async {
     _required(groupName, 'Group name is required.');
     if (members.isEmpty) throw Exception('Select at least one employee.');
+
+    // Upload the group image first, then send the returned Frappe file URL
+    // to the create-group API.
+    String? groupImageUrl;
+    if (groupImage != null) {
+      groupImageUrl = await uploadAttachment(
+        filePath: groupImage.path,
+        fileName: groupImage.uri.pathSegments.isNotEmpty
+            ? groupImage.uri.pathSegments.last
+            : 'group_image',
+        isPrivate: false,
+      );
+    }
+
     final data = await _post(
       ApiEndpoints.createChatGroup,
       data: {
         'group_name': groupName.trim(),
         'description': description?.trim() ?? '',
         'members': members.map((member) => member.toJson()).toList(),
+        if (groupImageUrl != null && groupImageUrl.isNotEmpty)
+          'group_image': groupImageUrl,
       },
     );
     return ChatGroupDetailsModel.fromJson(data);
@@ -187,9 +213,24 @@ class ChatService {
     String? groupName,
     String? description,
     bool? isActive,
+    File? groupImage,
   }) async {
     _required(group, 'Chat group is required.');
     if (groupName != null) _required(groupName, 'Group name is required.');
+
+    // Upload the new image first, then pass its Frappe file URL to the
+    // update-group API.
+    String? groupImageUrl;
+    if (groupImage != null) {
+      groupImageUrl = await uploadAttachment(
+        filePath: groupImage.path,
+        fileName: groupImage.uri.pathSegments.isNotEmpty
+            ? groupImage.uri.pathSegments.last
+            : 'group_image',
+        isPrivate: false,
+      );
+    }
+
     final data = await _post(
       ApiEndpoints.updateChatGroup,
       data: {
@@ -197,6 +238,8 @@ class ChatService {
         if (groupName != null) 'group_name': groupName.trim(),
         if (description != null) 'description': description.trim(),
         if (isActive != null) 'is_active': isActive ? 1 : 0,
+        if (groupImageUrl != null && groupImageUrl.isNotEmpty)
+          'group_image': groupImageUrl,
       },
     );
     return ChatGroupDetailsModel.fromJson(data);
@@ -243,10 +286,250 @@ class ChatService {
     );
   }
 
-  Future<Map<String, dynamic>> _get(
-    String url, {
-    Map<String, dynamic>? query,
+  Future<List<ChatMentionModel>> searchGroupMembers({
+    required String group,
+    String? search,
+    int limit = 30,
   }) async {
+    _required(group, 'Chat group is required.');
+    final data = await _get(
+      _chatEndpoint('search_group_members'),
+      query: {
+        'group': group.trim(),
+        if (search?.trim().isNotEmpty == true) 'search': search!.trim(),
+        'limit': limit.clamp(1, 100),
+      },
+    );
+    return _list(data['members'])
+        .map((row) => ChatMentionModel.fromJson(_map(row)))
+        .toList(growable: false);
+  }
+
+  Future<List<ChatGroupModel>> getForwardGroups() async {
+    final data = await _get(_chatEndpoint('get_forward_groups'));
+    return _list(data['groups'])
+        .map((row) => ChatGroupModel.fromJson(_map(row)))
+        .toList(growable: false);
+  }
+
+  Future<ChatMessagePageModel> searchMessages({
+    required String group,
+    required String search,
+    int limit = 40,
+    String? before,
+  }) async {
+    _required(group, 'Chat group is required.');
+    _required(search, 'Enter text to search.');
+    return ChatMessagePageModel.fromJson(
+      await _get(
+        _chatEndpoint('search_messages'),
+        query: {
+          'group': group.trim(),
+          'search': search.trim(),
+          'limit': limit.clamp(1, 100),
+          if (before?.trim().isNotEmpty == true) 'before': before!.trim(),
+        },
+      ),
+    );
+  }
+
+  Future<ChatMessageModel> editMessage({
+    required String message,
+    required String text,
+  }) async {
+    _required(message, 'Chat message is required.');
+    _required(text, 'Please enter a message.');
+    return ChatMessageModel.fromJson(
+      await _post(
+        _chatEndpoint('edit_message'),
+        data: {'message': message.trim(), 'text': text.trim()},
+      ),
+    );
+  }
+
+  Future<List<ChatMessageModel>> forwardMessage({
+    required String message,
+    required List<String> groups,
+  }) async {
+    _required(message, 'Chat message is required.');
+    final destinations = groups.map((item) => item.trim()).where((item) => item.isNotEmpty).toSet().toList();
+    if (destinations.isEmpty) throw Exception('Select at least one destination group.');
+    final data = await _post(
+      _chatEndpoint('forward_message'),
+      data: {'message': message.trim(), 'groups': destinations},
+    );
+    return _list(data['messages'])
+        .map((row) => ChatMessageModel.fromJson(_map(row)))
+        .toList(growable: false);
+  }
+
+  Future<List<ChatReactionModel>> setMessageReaction({
+    required String message,
+    required String reaction,
+  }) async {
+    _required(message, 'Chat message is required.');
+    _required(reaction, 'Select a reaction.');
+    final data = await _post(
+      _chatEndpoint('set_message_reaction'),
+      data: {'message': message.trim(), 'reaction': reaction.trim()},
+    );
+    return _parseReactions(data['reactions']);
+  }
+
+  Future<List<ChatReactionModel>> removeMessageReaction(String message) async {
+    _required(message, 'Chat message is required.');
+    final data = await _post(
+      _chatEndpoint('remove_reaction'),
+      data: {'message': message.trim()},
+    );
+    return _parseReactions(data['reactions']);
+  }
+
+  Future<bool> toggleBookmark({
+    required String message,
+    required bool bookmarked,
+  }) async {
+    _required(message, 'Chat message is required.');
+    final data = await _post(
+      _chatEndpoint('toggle_bookmark'),
+      data: {'message': message.trim(), 'bookmarked': bookmarked ? 1 : 0},
+    );
+    return _bool(data['bookmarked']);
+  }
+
+  Future<ChatMessagePageModel> getBookmarkedMessages({
+    int limit = 50,
+    String? before,
+  }) async {
+    return ChatMessagePageModel.fromJson(
+      await _get(
+        _chatEndpoint('get_bookmarked_messages'),
+        query: {
+          'limit': limit.clamp(1, 100),
+          if (before?.trim().isNotEmpty == true) 'before': before!.trim(),
+        },
+      ),
+    );
+  }
+
+  Future<bool> pinMessage(String message) => _setPinned(message, true);
+
+  Future<bool> unpinMessage(String message) => _setPinned(message, false);
+
+  Future<bool> _setPinned(String message, bool pinned) async {
+    _required(message, 'Chat message is required.');
+    final data = await _post(
+      _chatEndpoint('pin_message'),
+      data: {'message': message.trim(), 'pinned': pinned ? 1 : 0},
+    );
+    return _bool(data['pinned']);
+  }
+
+  Future<List<ChatMessageModel>> getPinnedMessages(String group) async {
+    _required(group, 'Chat group is required.');
+    final data = await _get(
+      _chatEndpoint('get_pinned_messages'),
+      query: {'group': group.trim()},
+    );
+    return _list(data['messages'])
+        .map((row) => ChatMessageModel.fromJson(_map(row)))
+        .toList(growable: false);
+  }
+
+  Future<ChatGroupMuteSetting> setGroupMute({
+    required String group,
+    required String duration,
+  }) async {
+    _required(group, 'Chat group is required.');
+    _required(duration, 'Mute duration is required.');
+    return ChatGroupMuteSetting.fromJson(
+      await _post(
+        _chatEndpoint('set_group_mute'),
+        data: {'group': group.trim(), 'duration': duration.trim()},
+      ),
+    );
+  }
+
+  Future<ChatGroupMuteSetting> getGroupNotificationSetting(String group) async {
+    _required(group, 'Chat group is required.');
+    return ChatGroupMuteSetting.fromJson(
+      await _get(
+        _chatEndpoint('get_group_notification_setting'),
+        query: {'group': group.trim()},
+      ),
+    );
+  }
+
+  Future<Map<String, dynamic>> publishTyping({
+    required String group,
+    required bool isTyping,
+  }) async {
+    _required(group, 'Chat group is required.');
+    return _post(
+      _chatEndpoint('publish_typing'),
+      data: {'group': group.trim(), 'is_typing': isTyping ? 1 : 0},
+    );
+  }
+
+  Future<Map<String, dynamic>> publishPresence({
+    required String group,
+    required bool isOnline,
+  }) async {
+    _required(group, 'Chat group is required.');
+    return _post(
+      _chatEndpoint('publish_presence'),
+      data: {'group': group.trim(), 'is_online': isOnline ? 1 : 0},
+    );
+  }
+
+  Future<List<ChatMessageReadStatusModel>> getMessageReadStatus(String message) async {
+    _required(message, 'Chat message is required.');
+    final data = await _get(
+      _chatEndpoint('get_message_read_status'),
+      query: {'message': message.trim()},
+    );
+    return _list(data['statuses'])
+        .map((row) => ChatMessageReadStatusModel.fromJson(_map(row)))
+        .toList(growable: false);
+  }
+
+  Future<ChatMessagePageModel> getChatMedia({
+    required String group,
+    String mediaType = 'all',
+    int limit = 50,
+    String? before,
+  }) async {
+    _required(group, 'Chat group is required.');
+    return ChatMessagePageModel.fromJson(
+      await _get(
+        _chatEndpoint('get_chat_media'),
+        query: {
+          'group': group.trim(),
+          'media_type': mediaType.trim().toLowerCase(),
+          'limit': limit.clamp(1, 100),
+          if (before?.trim().isNotEmpty == true) 'before': before!.trim(),
+        },
+      ),
+    );
+  }
+
+  String _chatEndpoint(String method) => '${ApiEndpoints.chatApi}.$method';
+
+  List<ChatReactionModel> _parseReactions(dynamic value) => _list(value)
+      .map((row) => ChatReactionModel.fromJson(_map(row)))
+      .toList(growable: false);
+
+  bool _bool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    return const {'1', 'true', 'yes', 'on'}
+        .contains(value?.toString().toLowerCase());
+  }
+
+  Future<Map<String, dynamic>> _get(
+      String url, {
+        Map<String, dynamic>? query,
+      }) async {
     try {
       return _message((await _api.get(url: url, queryParameters: query)).data);
     } on DioException catch (error) {
@@ -255,9 +538,9 @@ class ChatService {
   }
 
   Future<Map<String, dynamic>> _post(
-    String url, {
-    required Map<String, dynamic> data,
-  }) async {
+      String url, {
+        required Map<String, dynamic> data,
+      }) async {
     try {
       return _message((await _api.post(url: url, data: data)).data);
     } on DioException catch (error) {
@@ -280,10 +563,10 @@ class ChatService {
   }
 
   String _messageType(ChatMessageType type) => switch (type) {
-        ChatMessageType.text => 'Text',
-        ChatMessageType.image => 'Image',
-        ChatMessageType.file => 'File',
-      };
+    ChatMessageType.text => 'Text',
+    ChatMessageType.image => 'Image',
+    ChatMessageType.file => 'File',
+  };
 
   String _dioMessage(DioException error) {
     final data = error.response?.data;
@@ -307,6 +590,39 @@ class ChatService {
   }
 }
 
+class ChatGroupMuteSetting {
+  final String group;
+  final DateTime? mutedUntil;
+  final bool isMuted;
+
+  const ChatGroupMuteSetting({
+    required this.group,
+    this.mutedUntil,
+    required this.isMuted,
+  });
+
+  factory ChatGroupMuteSetting.fromJson(Map<String, dynamic> json) {
+    final rawDate = json['muted_until']?.toString().trim() ?? '';
+    final mutedUntil = rawDate.isEmpty
+        ? null
+        : DateTime.tryParse(rawDate.replaceFirst(' ', 'T'));
+    bool asBool(dynamic value) {
+      if (value is bool) return value;
+      if (value is num) return value != 0;
+      return const {'1', 'true', 'yes', 'on'}
+          .contains(value?.toString().toLowerCase());
+    }
+
+    return ChatGroupMuteSetting(
+      group: json['group']?.toString() ?? '',
+      mutedUntil: mutedUntil,
+      isMuted: json.containsKey('is_muted')
+          ? asBool(json['is_muted'])
+          : mutedUntil != null && mutedUntil.isAfter(DateTime.now()),
+    );
+  }
+}
+
 class ChatMemberInput {
   final String employee;
   final bool canSend;
@@ -314,7 +630,7 @@ class ChatMemberInput {
   const ChatMemberInput({required this.employee, this.canSend = true});
 
   Map<String, dynamic> toJson() => {
-        'employee': employee.trim(),
-        'can_send': canSend ? 1 : 0,
-      };
+    'employee': employee.trim(),
+    'can_send': canSend ? 1 : 0,
+  };
 }

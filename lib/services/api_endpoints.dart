@@ -1,6 +1,6 @@
 class ApiEndpoints {
 
-  static const String baseUrl = "http://110.225.251.71:9009";
+  static const String baseUrl = "https://erp.erpkey.in";
 
 // =========================
 // Authentication
@@ -11,6 +11,14 @@ class ApiEndpoints {
 
   static const String logout =
       "$baseUrl/api/method/geo_attendance.api.mobile_logout";
+
+  static const String forgotPassword =
+      "$baseUrl/api/method/frappe.core.doctype.user.user.reset_password";
+
+
+
+  static const String updatePassword =
+      "$baseUrl/api/method/frappe.auth.update_password";
 
 
 // =========================
@@ -99,8 +107,14 @@ class ApiEndpoints {
       '$baseUrl/api/method/geo_attendance.todo_api.complete_employee_todo';
   static const String employeeProfile =
       '$baseUrl/api/method/geo_attendance.employee_profile_api.get_employee_profile';
+  static const String updateEmployeePhoto =
+      "$baseUrl/api/method/geo_attendance.employee_profile_api.update_employee_photo";
   static const String issueApi =
       "$baseUrl/api/method/geo_attendance.issue_api";
+
+
+  static const String companyProjects =
+      "$baseUrl/api/method/geo_attendance.todo.get_company_projects";
 
   // ============================================================
   // EMPLOYEE
@@ -170,6 +184,10 @@ class ApiEndpoints {
 
   static const String attendanceCalendar =
       "$baseUrl/api/method/geo_attendance.attendance.get_my_attendance_calendar";
+
+
+  static const String myShiftInfo =
+      "$baseUrl/api/method/geo_attendance.attendance.get_my_shift_info";
 
 
 //   leaves
@@ -278,6 +296,57 @@ class ApiEndpoints {
   static const String uploadFile =
       "$baseUrl/api/method/upload_file";
 
+  static const String searchChatGroupMembers =
+      "$chatApi.search_group_members";
+
+  static const String chatForwardGroups =
+      "$chatApi.get_forward_groups";
+
+  static const String searchChatMessages =
+      "$chatApi.search_messages";
+
+  static const String editChatMessage =
+      "$chatApi.edit_message";
+
+  static const String forwardChatMessage =
+      "$chatApi.forward_message";
+
+  static const String setChatMessageReaction =
+      "$chatApi.set_message_reaction";
+
+  static const String removeChatMessageReaction =
+      "$chatApi.remove_reaction";
+
+  static const String chatMessageReadStatus =
+      "$chatApi.get_message_read_status";
+
+  static const String publishChatTyping =
+      "$chatApi.publish_typing";
+
+  static const String publishChatPresence =
+      "$chatApi.publish_presence";
+
+  static const String setChatGroupMute =
+      "$chatApi.set_group_mute";
+
+  static const String chatGroupNotificationSetting =
+      "$chatApi.get_group_notification_setting";
+
+  static const String toggleChatBookmark =
+      "$chatApi.toggle_bookmark";
+
+  static const String bookmarkedChatMessages =
+      "$chatApi.get_bookmarked_messages";
+
+  static const String pinChatMessage =
+      "$chatApi.pin_message";
+
+  static const String pinnedChatMessages =
+      "$chatApi.get_pinned_messages";
+
+  static const String chatMedia =
+      "$chatApi.get_chat_media";
+
 //   performance
   static const String performanceApi =
       "$baseUrl/api/method/geo_attendance.report";
@@ -296,5 +365,117 @@ class ApiEndpoints {
 
   static const String performanceDepartments =
       "$performanceApi.get_performance_departments";
+
+
+  // Add these constants inside your existing ApiEndpoints class.
+
+// ============================================================
+// KNOWLEDGE HUB
+// ============================================================
+
+  static const String knowledgeApi =
+      "$baseUrl/api/method/geo_attendance.knowledge";
+
+  static const String knowledgeAccess =
+      "$knowledgeApi.get_knowledge_access";
+
+  static const String knowledgeResources =
+      "$knowledgeApi.get_knowledge_resources";
+
+  static const String knowledgeResource =
+      "$knowledgeApi.get_knowledge_resource";
+
+  static const String createKnowledgeResource =
+      "$knowledgeApi.create_knowledge_resource";
+
+  static const String updateKnowledgeResource =
+      "$knowledgeApi.update_knowledge_resource";
+
+  static const String submitKnowledgeForReview =
+      "$knowledgeApi.submit_knowledge_for_review";
+
+  static const String reviewKnowledgeResource =
+      "$knowledgeApi.review_knowledge_resource";
+
+  static const String publishKnowledgeResource =
+      "$knowledgeApi.publish_knowledge_resource";
+
+  static const String rejectKnowledgeResource =
+      "$knowledgeApi.reject_knowledge_resource";
+
+  static const String deleteKnowledgeResource =
+      "$knowledgeApi.delete_knowledge_resource";
+
+// work
+
+
+  static const String myWork =
+      '$baseUrl/api/method/geo_attendance.todo_api.get_my_work';
+
+  static const String dashboardWork =
+      '$baseUrl/api/method/geo_attendance.todo_api.get_dashboard_work';
+
+
+  // Add these constants inside your existing ApiEndpoints class.
+
+// ============================================================
+// MEETINGS
+// ============================================================
+
+  static const String meetingApi =
+      "$baseUrl/api/method/geo_attendance.meeting";
+
+  static const String meetingAccess =
+      "$meetingApi.get_meeting_access";
+
+  static const String meetingEmployees =
+      "$meetingApi.get_company_employees";
+
+  static const String myMeetings =
+      "$meetingApi.get_my_meetings";
+
+  static const String meetingDetails =
+      "$meetingApi.get_meeting_details";
+
+  static const String createMeeting =
+      "$meetingApi.create_meeting";
+
+  static const String updateMeeting =
+      "$meetingApi.update_meeting";
+
+  static const String cancelMeeting =
+      "$meetingApi.cancel_meeting";
+
+  static const String updateMeetingAttendance =
+      "$meetingApi.update_meeting_attendance";
+
+  static const String updateMeetingOutcome =
+      "$meetingApi.update_meeting_outcome";
+
+  static const String addMeetingActionItem =
+      "$meetingApi.add_meeting_action_item";
+
+  static const String updateMeetingActionItem =
+      "$meetingApi.update_meeting_action_item";
+
+  static const String deleteMeetingActionItem =
+      "$meetingApi.delete_meeting_action_item";
+
+  static const String createMeetingTask =
+      "$meetingApi.create_task_from_action_item";
+
+
+  // ============================================================
+// ACTIONS NEEDED
+// ============================================================
+
+  static const String actionsNeededApi =
+      "$baseUrl/api/method/geo_attendance.actions_needed";
+
+  static const String actionsNeeded =
+      "$actionsNeededApi.get_actions_needed";
+
+
+
 
 }
