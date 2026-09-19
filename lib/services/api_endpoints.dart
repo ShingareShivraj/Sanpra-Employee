@@ -20,6 +20,9 @@ class ApiEndpoints {
   static const String updatePassword =
       "$baseUrl/api/method/frappe.auth.update_password";
 
+  static const String changePassword =
+      "$baseUrl/api/method/frappe.core.doctype.user.user.update_password";
+
 
 // =========================
 // Dashboard
@@ -475,6 +478,23 @@ class ApiEndpoints {
   static const String actionsNeeded =
       "$actionsNeededApi.get_actions_needed";
 
+
+  // leads
+  static const String leadApi =
+      "$baseUrl/api/method/geo_attendance.lead";
+
+  static const String leadDetails = "$leadApi.lead_details";
+  static const String leads = "$leadApi.get_leads";
+  static const String leadDetail = "$leadApi.get_lead_details";
+  static const String createLead = "$leadApi.create_lead";
+  static const String updateLead = "$leadApi.update_lead";
+  static const String deleteLead = "$leadApi.delete_lead";
+
+  static const String createLeadEvent = "$leadApi.create_lead_event";
+  static const String leadEvents = "$leadApi.get_lead_events";
+  static const String leadEvent = "$leadApi.get_lead_event";
+  static const String updateLeadEvent = "$leadApi.update_lead_event";
+  static const String deleteLeadEvent = "$leadApi.delete_lead_event";
 
 
 

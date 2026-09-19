@@ -12,6 +12,7 @@ import '../chat/manager/chat_manager_screen.dart';
 import '../issues/company_issues_screen.dart';
 import '../issues/issue_screen.dart';
 import '../knowledge_hub/knowledge_hub_screen.dart';
+import '../lead/list_lead_screen.dart';
 import '../leave/approver/leave_management_page.dart';
 import '../leave/employee/leave_page.dart';
 import '../login/login_page.dart';
@@ -47,6 +48,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final DashboardViewModel vm = DashboardViewModel();
   bool _isLeaveApprover = false;
   bool _canAccessMobileIssue = false;
+  bool _canAccessMobileLead = false;
   int _selectedTab = 0;
   Timer? _workTimer;
   Duration _workedDuration = Duration.zero;
@@ -110,6 +112,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return '$hours:$minutes:$seconds';
   }
+  String _formatWorkedHoursMinutes(Duration duration) {
+    final hours = duration.inHours.toString().padLeft(2, '0');
+    final minutes =
+    (duration.inMinutes % 60).toString().padLeft(2, '0');
+
+    return '$hours:$minutes';
+  }
 
   @override
   void dispose() {
@@ -130,6 +139,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       // NEW: Employee can see the Issues button ONLY
       // when the "Mobile Issue" role is assigned.
       _canAccessMobileIssue = roles.contains('Mobile Issue');
+
+      // Leads access
+      _canAccessMobileLead = roles.contains('Mobile Lead');
     });
   }
 
@@ -526,7 +538,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   width: 34,
                                   height: 34,
                                   decoration: BoxDecoration(
-                                    color: kBluePrimary.withOpacity(.10),
+                                    color: kBluePrimary,
                                     borderRadius: BorderRadius.circular(9),
                                   ),
                                   child: const Icon(
@@ -604,17 +616,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             },
                             style: ElevatedButton.styleFrom(
                               elevation: 0,
-                              backgroundColor: const Color(0xFFF04438),
+                              backgroundColor: kBluePrimary,
                               foregroundColor: Colors.white,
+                              disabledBackgroundColor: Colors.white.withAlpha(46), // .18
+                              disabledForegroundColor: Colors.white.withAlpha(115), // .45
                               padding: const EdgeInsets.symmetric(
-                                vertical: 13,
+                                horizontal: 12,
+                                vertical: 10,
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(13),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
+                                borderRadius: BorderRadius.circular(11),
                               ),
                             ),
                             child: const Text('Check Out'),
@@ -637,7 +648,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       await vm.checkOut();
 
       if (mounted) {
-        _updateWorkedDuration();
+        setState(() {
+          _workedDuration = currentWorkedDuration;
+        });
+
         _stopWorkTimer();
         _showSnack(vm.attendanceStatus);
       }
@@ -751,11 +765,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
           MaterialPageRoute(builder: (_) => const AttendancePage()),
         ),
       ),
+
       _DashboardAction(
         icon: Icons.work_outline_rounded,
         label: 'My Work',
         onTap: _openMyWork,
       ),
+
+      if (_canAccessMobileLead)
+        _DashboardAction(
+          icon: Icons.person_search_rounded,
+          label: 'Leads',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const ListLeadScreen(),
+            ),
+          ),
+        ),
       // NEW: Show Issues only when the logged-in employee
 // has the "Mobile Issue" role.
       if (_canAccessMobileIssue)
@@ -851,6 +878,65 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _selectTab(int index) {
     if (_selectedTab == index) return;
     setState(() => _selectedTab = index);
+  }
+
+
+  Widget _buildAttendanceTimeRow({
+    required IconData icon,
+    required String label,
+    required String time,
+  }) {
+    final hasTime = time.isNotEmpty;
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 10,
+          vertical: 9,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(.10),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: Colors.white.withOpacity(.20),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: Colors.white.withOpacity(.85),
+              size: 17,
+            ),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(.65),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasTime ? time : '--:--',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildDemoContactInfo() {
@@ -1166,13 +1252,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+
   Widget _buildAttendancePanel() {
     final checkedIn = _isCheckedIn;
+
     final checkedOut =
     vm.attendanceStatus.toLowerCase().contains('checked out');
 
+    final isLoading = vm.attendanceLoading;
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final appPrimary = colorScheme.primary;
+
+    // Check In:
+    // Enabled only when the employee has not checked in or checked out.
+    final canCheckIn =
+        !isLoading && !checkedIn && !checkedOut;
+
+    // Check Out:
+    // Enabled only after check in and before check out.
+    final canCheckOut =
+        !isLoading && checkedIn && !checkedOut;
+
+    final displayedDuration =
+    _formatWorkedHoursMinutes(_workedDuration);
+
     return Container(
-      padding: const EdgeInsets.all(11),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 10,
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(.14),
         borderRadius: BorderRadius.circular(17),
@@ -1187,150 +1296,246 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          // Attendance icon
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(.18),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: Icon(
-              checkedOut
-                  ? Icons.check_circle_outline_rounded
-                  : Icons.punch_clock_outlined,
-              color: Colors.white,
-              size: 23,
-            ),
+          // Shift timing / worked duration row
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(.18),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  checkedOut
+                      ? Icons.check_circle_outline_rounded
+                      : Icons.schedule_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Text(
+                    //   checkedOut
+                    //       ? 'TOTAL WORKED'
+                    //       : 'SHIFT TIMING',
+                    //   style: TextStyle(
+                    //     color: Colors.white.withOpacity(.70),
+                    //     fontSize: 9,
+                    //     fontWeight: FontWeight.w700,
+                    //     letterSpacing: .7,
+                    //   ),
+                    // ),
+                    //
+                    // const SizedBox(height: 3),
+
+                    Text(
+                      checkedIn || checkedOut
+                          ? 'Worked today'
+                          : 'Not started',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(.92),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Small HH:MM timer in the same row
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (checkedIn && !checkedOut)
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.only(right: 5),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF32D583),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+
+                  Text(
+                    checkedIn || checkedOut
+                        ? displayedDuration
+                        : '--:--',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: .3,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
 
-          const SizedBox(width: 10),
 
-          // Time / timer information
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  checkedOut
-                      ? 'TOTAL WORKED'
-                      : checkedIn
-                      ? 'WORKED TODAY'
-                      : 'CHECK IN',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(.72),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: .8,
+
+          const SizedBox(height: 5),
+
+          Row(
+            children: [
+              // CHECK IN
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: canCheckIn ? _handleCheckIn : null,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: Colors.white,
+                    foregroundColor: appPrimary,
+                    disabledBackgroundColor: Colors.white.withOpacity(.14),
+                    disabledForegroundColor: Colors.white.withOpacity(.45),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(11),
+                      side: BorderSide(
+                        color: canCheckIn
+                            ? Colors.white.withOpacity(.80)
+                            : Colors.white.withOpacity(.18),
+                      ),
+                    ),
                   ),
-                ),
-
-                const SizedBox(height: 3),
-
-                if (checkedIn && !checkedOut)
-                  Row(
+                  child: Row(
                     children: [
-                      Text(
-                        _formatWorkedDuration(_workedDuration),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          height: 1.1,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: .2,
-                        ),
+                      Icon(
+                        Icons.login_rounded,
+                        size: 19,
+                        color: canCheckIn
+                            ? appPrimary
+                            : Colors.white.withOpacity(.45),
                       ),
 
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 7),
 
-                      // Small live indicator
-                      Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF32D583),
-                          shape: BoxShape.circle,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'CHECK IN',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: canCheckIn
+                                    ? appPrimary
+                                    : Colors.white.withOpacity(.45),
+                              ),
+                            ),
+
+                            const SizedBox(height: 2),
+
+                            Text(
+                              vm.checkInTime.isNotEmpty
+                                  ? vm.checkInTime
+                                  : '--:--',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: canCheckIn
+                                    ? colorScheme.onSurfaceVariant
+                                    : Colors.white.withOpacity(.45),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
-                  )
-                else if (checkedOut)
-                  Text(
-                    // Keep the final total from the stopped timer.
-                    _formatWorkedDuration(_workedDuration),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      height: 1.1,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: .2,
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 10),
+
+              // CHECK OUT
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: canCheckOut ? _handleCheckOut : null,
+                  style: ElevatedButton.styleFrom(
+                    elevation: 0,
+                    backgroundColor: Colors.white,
+                    foregroundColor: appPrimary,
+                    disabledBackgroundColor: Colors.white.withOpacity(.14),
+                    disabledForegroundColor: Colors.white.withOpacity(.45),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 9,
                     ),
-                  )
-                else
-                  Text(
-                    'Ready to start',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(.90),
-                      fontSize: 13,
-                      height: 1.1,
-                      fontWeight: FontWeight.w700,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(11),
+                      side: BorderSide(
+                        color: canCheckOut
+                            ? Colors.white.withOpacity(.80)
+                            : Colors.white.withOpacity(.18),
+                      ),
                     ),
                   ),
-              ],
-            ),
-          ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.logout_rounded,
+                        size: 19,
+                        color: canCheckOut
+                            ? appPrimary
+                            : Colors.white.withOpacity(.45),
+                      ),
 
-          const SizedBox(width: 8),
+                      const SizedBox(width: 7),
 
-          // Check In / Check Out button
-          ElevatedButton.icon(
-            onPressed: vm.attendanceLoading
-                ? null
-                : checkedIn
-                ? _handleCheckOut
-                : _handleCheckIn,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'CHECK OUT',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: canCheckOut
+                                    ? appPrimary
+                                    : Colors.white.withOpacity(.45),
+                              ),
+                            ),
 
-            icon: vm.attendanceLoading
-                ? const SizedBox(
-              width: 15,
-              height: 15,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: kBluePrimary,
+                            const SizedBox(height: 2),
+
+                            Text(
+                              vm.checkOutTime.isNotEmpty
+                                  ? vm.checkOutTime
+                                  : '--:--',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: canCheckOut
+                                    ? colorScheme.onSurfaceVariant
+                                    : Colors.white.withOpacity(.45),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            )
-                : Icon(
-              checkedIn
-                  ? Icons.logout_rounded
-                  : Icons.login_rounded,
-              size: 16,
-            ),
-
-            label: Text(
-              checkedIn ? 'Check Out' : 'Check In',
-            ),
-
-            style: ElevatedButton.styleFrom(
-              elevation: 0,
-              backgroundColor: Colors.white,
-              foregroundColor: kBluePrimary,
-              disabledBackgroundColor:
-              Colors.white.withOpacity(.75),
-              disabledForegroundColor: kBluePrimary,
-              padding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 10,
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            ],
           ),
         ],
       ),
