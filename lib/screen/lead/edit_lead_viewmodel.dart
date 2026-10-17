@@ -9,12 +9,18 @@ class EditLeadViewModel extends ChangeNotifier {
   LeadModel? lead;
   LeadMasterDataModel masterData = const LeadMasterDataModel();
   List<LeadEventModel> events = const [];
+  List<LeadTaskModel> tasks = const [];
+  bool _disposed = false;
+
   bool loading = false;
   bool saving = false;
+
   bool eventBusy = false;
+  bool taskBusy = false;
+
   String? error;
   String? eventsError;
-  bool _disposed = false;
+  String? tasksError;
 
   EditLeadViewModel({
     required this.leadName,
@@ -30,6 +36,27 @@ class EditLeadViewModel extends ChangeNotifier {
         : leadName.trim();
   }
 
+  List<LeadTaskAssigneeModel> get taskAssignees =>
+      masterData.taskAssignees;
+
+  List<String> get taskStatuses =>
+      masterData.taskStatuses.isNotEmpty
+          ? masterData.taskStatuses
+          : const [
+        'Open',
+        'Closed',
+        'Cancelled',
+      ];
+
+  List<String> get taskPriorities =>
+      masterData.taskPriorities.isNotEmpty
+          ? masterData.taskPriorities
+          : const [
+        'Low',
+        'Medium',
+        'High',
+      ];
+
   Future<void> initialise() async {
     loading = true;
     error = null;
@@ -41,7 +68,10 @@ class EditLeadViewModel extends ChangeNotifier {
       ]);
       lead = results[0] as LeadModel;
       masterData = results[1] as LeadMasterDataModel;
-      await loadEvents();
+      await Future.wait([
+        loadEvents(),
+        loadTasks(),
+      ]);
     } catch (e) {
       error = _message(e);
     } finally {
@@ -60,6 +90,40 @@ class EditLeadViewModel extends ChangeNotifier {
     } catch (e) {
       eventsError = _message(e);
     }
+    _notify();
+  }
+
+  Future<void> loadTasks() async {
+    tasksError = null;
+
+    try {
+      final result = await _service.getLeadTasks(
+        currentLeadId,
+      );
+
+      final loadedTasks = [...result.tasks];
+
+      loadedTasks.sort((first, second) {
+        final firstDate = first.dueDate;
+        final secondDate = second.dueDate;
+
+        if (firstDate == null && secondDate == null) {
+          return second.creation
+              ?.compareTo(first.creation ?? DateTime(1970)) ??
+              0;
+        }
+
+        if (firstDate == null) return 1;
+        if (secondDate == null) return -1;
+
+        return firstDate.compareTo(secondDate);
+      });
+
+      tasks = loadedTasks;
+    } catch (e) {
+      tasksError = _message(e);
+    }
+
     _notify();
   }
 
@@ -104,6 +168,46 @@ class EditLeadViewModel extends ChangeNotifier {
     }
   }
 
+  Future<String?> saveTask(
+      LeadTaskModel value,
+      ) async {
+    if (taskBusy) return null;
+
+    taskBusy = true;
+    tasksError = null;
+    _notify();
+
+    try {
+      final LeadTaskMutationResultModel result;
+
+      if (value.name.trim().isEmpty) {
+        result = await _service.createLeadTask(
+          leadName: currentLeadId,
+          task: value.copyWith(
+            leadId: currentLeadId,
+          ),
+        );
+      } else {
+        result = await _service.updateLeadTask(
+          value.copyWith(
+            leadId: currentLeadId,
+          ),
+        );
+      }
+
+      await loadTasks();
+
+      return result.message;
+    } catch (e) {
+      tasksError = _message(e);
+      return null;
+    } finally {
+      taskBusy = false;
+      _notify();
+    }
+  }
+
+
   Future<String?> deleteEvent(String eventName) async {
     if (eventBusy) return null;
     eventBusy = true;
@@ -118,6 +222,44 @@ class EditLeadViewModel extends ChangeNotifier {
       return null;
     } finally {
       eventBusy = false;
+      _notify();
+    }
+  }
+
+  Future<String?> deleteTask(
+      String taskName,
+      ) async {
+    if (taskBusy) return null;
+
+    final cleanTaskName = taskName.trim();
+
+    if (cleanTaskName.isEmpty) {
+      tasksError = 'Task is required.';
+      _notify();
+      return null;
+    }
+
+    taskBusy = true;
+    tasksError = null;
+    _notify();
+
+    try {
+      final result = await _service.deleteLeadTask(
+        cleanTaskName,
+      );
+
+      tasks = tasks
+          .where(
+            (task) => task.name != cleanTaskName,
+      )
+          .toList(growable: false);
+
+      return result.message;
+    } catch (e) {
+      tasksError = _message(e);
+      return null;
+    } finally {
+      taskBusy = false;
       _notify();
     }
   }

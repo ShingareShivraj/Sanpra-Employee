@@ -497,5 +497,64 @@ class ApiEndpoints {
   static const String deleteLeadEvent = "$leadApi.delete_lead_event";
 
 
+  // ============================================================
+// LEAD TASKS
+// ============================================================
+
+  static const String createLeadTask =
+      "$leadApi.create_lead_task";
+
+  static const String leadTasks =
+      "$leadApi.get_lead_tasks";
+
+  static const String leadTask =
+      "$leadApi.get_lead_task";
+
+  static const String updateLeadTask =
+      "$leadApi.update_lead_task";
+
+  static const String deleteLeadTask =
+      "$leadApi.delete_lead_task";
+
+
+
+  // ============================================================
+// CUSTOMER CALL TRACKING
+// ============================================================
+
+  static const String customerCallApi =
+      "$baseUrl/api/method/geo_attendance.customer_call";
+
+  static const String customerCallAccess =
+      "$customerCallApi.get_customer_call_access";
+
+  static const String customerCallCustomers =
+      "$customerCallApi.search_customers";
+
+  static const String customerCallCustomerDetails =
+      "$customerCallApi.get_customer_details";
+
+  static const String customerCallPhoneLookup =
+      "$customerCallApi.get_customer_phone_lookup";
+
+  static const String createCustomerCall =
+      "$customerCallApi.create_customer_call_record";
+
+  static const String syncCustomerCalls =
+      "$customerCallApi.sync_customer_call_records";
+
+  static const String customerCalls =
+      "$customerCallApi.get_customer_call_records";
+
+  static const String customerCall =
+      "$customerCallApi.get_customer_call_record";
+
+  static const String attachCustomerCallRecording =
+      "$customerCallApi.attach_recording_file";
+
+  static const String removeCustomerCallRecording =
+      "$customerCallApi.remove_recording_file";
+
+
 
 }

@@ -152,6 +152,186 @@ class LeadService {
     );
   }
 
+  Future<LeadTaskListModel> getLeadTasks(
+      String leadName,
+      ) async {
+    _required(leadName, 'Lead is required.');
+
+    final response = await _get(
+      ApiEndpoints.leadTasks,
+      query: {
+        'lead': leadName.trim(),
+      },
+    );
+
+    return LeadTaskListModel.fromJson(response.data);
+  }
+
+  Future<LeadTaskModel> getLeadTask(
+      String taskName,
+      ) async {
+    _required(taskName, 'Task is required.');
+
+    final response = await _get(
+      ApiEndpoints.leadTask,
+      query: {
+        'task': taskName.trim(),
+      },
+    );
+
+    return LeadTaskModel.fromJson(response.data);
+  }
+
+  Future<LeadTaskMutationResultModel> createLeadTask({
+    required String leadName,
+    required LeadTaskModel task,
+  }) async {
+    _required(leadName, 'Lead is required.');
+    _validateTask(task);
+
+    final response = await _post(
+      ApiEndpoints.createLeadTask,
+      data: {
+        'lead': leadName.trim(),
+        ...task.toWriteJson(),
+      },
+    );
+
+    return _taskMutation(
+      response,
+      fallbackLeadId: leadName.trim(),
+    );
+  }
+
+  Future<LeadTaskMutationResultModel> updateLeadTask(
+      LeadTaskModel task,
+      ) async {
+    _required(task.name, 'Task is required.');
+    _validateTask(task);
+
+    final response = await _post(
+      ApiEndpoints.updateLeadTask,
+      data: {
+        'task': task.name.trim(),
+        ...task.toWriteJson(
+          includeEmptyValues: true,
+        ),
+      },
+    );
+
+    return _taskMutation(
+      response,
+      fallbackLeadId: task.leadId,
+    );
+  }
+
+  Future<LeadDeleteResultModel> deleteLeadTask(
+      String taskName,
+      ) async {
+    _required(taskName, 'Task is required.');
+
+    final response = await _post(
+      ApiEndpoints.deleteLeadTask,
+      data: {
+        'task': taskName.trim(),
+      },
+    );
+
+    return LeadDeleteResultModel(
+      message: response.message,
+      id: _string(
+        response.data['todo_id'],
+        fallback: _string(
+          response.data['task_id'],
+          fallback: taskName.trim(),
+        ),
+      ),
+    );
+  }
+
+  void _validateTask(LeadTaskModel task) {
+    _required(
+      task.taskDescription,
+      'Task description is required.',
+    );
+
+    _required(
+      task.assignedTo,
+      'Please select an employee.',
+    );
+
+    if (task.dueDate == null) {
+      throw const LeadServiceException(
+        'Task date is required.',
+      );
+    }
+
+    const allowedStatuses = {
+      'Open',
+      'Closed',
+      'Cancelled',
+    };
+
+    if (!allowedStatuses.contains(task.status.trim())) {
+      throw const LeadServiceException(
+        'Invalid task status.',
+      );
+    }
+
+    const allowedPriorities = {
+      'Low',
+      'Medium',
+      'High',
+    };
+
+    if (!allowedPriorities.contains(task.priority.trim())) {
+      throw const LeadServiceException(
+        'Invalid task priority.',
+      );
+    }
+  }
+
+  LeadTaskMutationResultModel _taskMutation(
+      _LeadEnvelope response, {
+        required String fallbackLeadId,
+      }) {
+    final taskJson = _map(
+      response.data['task'],
+    );
+
+    final leadId = _string(
+      response.data['lead_id'],
+      fallback: fallbackLeadId,
+    );
+
+    final taskId = _string(
+      response.data['todo_id'],
+      fallback: _string(
+        response.data['task_id'],
+        fallback: _string(taskJson['name']),
+      ),
+    );
+
+    final task = LeadTaskModel.fromJson({
+      ...taskJson,
+      'name': _string(
+        taskJson['name'],
+        fallback: taskId,
+      ),
+      'lead_id': leadId,
+    });
+
+    return LeadTaskMutationResultModel(
+      message: response.message,
+      taskId: taskId,
+      leadId: leadId,
+      company: _string(
+        response.data['company'],
+      ),
+      task: task,
+    );
+  }
+
   LeadMutationResultModel _leadMutation(_LeadEnvelope response) {
     final leadJson = _map(response.data['lead']);
     final lead = LeadModel.fromJson(leadJson);

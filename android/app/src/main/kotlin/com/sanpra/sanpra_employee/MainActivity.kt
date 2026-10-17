@@ -1,4 +1,4 @@
-package com.example.sanpra_employee
+package com.sanpra.sanpra_employee
 
 import io.flutter.embedding.android.FlutterActivity
 

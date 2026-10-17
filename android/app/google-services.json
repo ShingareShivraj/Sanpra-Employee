@@ -23,6 +23,25 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:747921119752:android:0a53ecae3c15223ff4cfbd",
+        "android_client_info": {
+          "package_name": "com.sanpra.sanpra_employee"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANoEbkpiswmE0yppR9Bjai3Xci3MkHKK0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"

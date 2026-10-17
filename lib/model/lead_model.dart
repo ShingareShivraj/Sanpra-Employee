@@ -1,5 +1,11 @@
 enum LeadEventTiming { upcoming, ongoing, past }
 
+enum LeadTaskStatus {
+  open,
+  closed,
+  cancelled,
+}
+
 class LeadModel {
   final String name;
   final String leadName;
@@ -192,17 +198,218 @@ class LeadEventModel {
   }
 }
 
+class LeadTaskAssigneeModel {
+  final String employee;
+  final String employeeName;
+  final String userId;
+  final String designation;
+  final String department;
+
+  const LeadTaskAssigneeModel({
+    required this.employee,
+    required this.employeeName,
+    required this.userId,
+    this.designation = '',
+    this.department = '',
+  });
+
+  factory LeadTaskAssigneeModel.fromJson(Map<String, dynamic> json) {
+    return LeadTaskAssigneeModel(
+      employee: _string(json['name']),
+      employeeName: _string(
+        json['employee_name'],
+        fallback: _string(json['name']),
+      ),
+      userId: _string(json['user_id']),
+      designation: _string(json['designation']),
+      department: _string(json['department']),
+    );
+  }
+}
+class LeadTaskModel {
+  final String name;
+  final String leadId;
+
+  // subject is retained for compatibility with the existing UI.
+  final String subject;
+
+  // This maps to ToDo.description.
+  final String description;
+
+  final String status;
+  final String priority;
+  final DateTime? dueDate;
+
+  // ToDo.allocated_to: one User email, not a List.
+  final String assignedTo;
+
+  final String assignedBy;
+  final String owner;
+  final DateTime? creation;
+  final DateTime? modified;
+
+  const LeadTaskModel({
+    this.name = '',
+    this.leadId = '',
+    this.subject = '',
+    this.description = '',
+    this.status = 'Open',
+    this.priority = 'Medium',
+    this.dueDate,
+    this.assignedTo = '',
+    this.assignedBy = '',
+    this.owner = '',
+    this.creation,
+    this.modified,
+  });
+
+  String get taskDescription {
+    final value = description.trim();
+    return value.isNotEmpty ? value : subject.trim();
+  }
+
+  factory LeadTaskModel.fromJson(Map<String, dynamic> json) {
+    final description = _string(
+      json['description'],
+      fallback: _string(json['subject']),
+    );
+
+    return LeadTaskModel(
+      name: _string(
+        json['name'],
+        fallback: _string(
+          json['todo_id'],
+          fallback: _string(json['task_id']),
+        ),
+      ),
+      leadId: _string(
+        json['lead_id'],
+        fallback: json['reference_type']?.toString() == 'Lead'
+            ? _string(json['reference_name'])
+            : '',
+      ),
+      subject: _string(
+        json['subject'],
+        fallback: description,
+      ),
+      description: description,
+      status: _string(
+        json['status'],
+        fallback: 'Open',
+      ),
+      priority: _string(
+        json['priority'],
+        fallback: 'Medium',
+      ),
+      dueDate: _dateTime(
+        json['date'] ?? json['due_date'],
+      ),
+      assignedTo: _string(
+        json['allocated_to'],
+        fallback: _string(json['assigned_to']),
+      ),
+      assignedBy: _string(json['assigned_by']),
+      owner: _string(json['owner']),
+      creation: _dateTime(json['creation']),
+      modified: _dateTime(json['modified']),
+    );
+  }
+
+  Map<String, dynamic> toWriteJson({
+    bool includeEmptyValues = false,
+  }) {
+    return <String, dynamic>{
+      'description': taskDescription,
+
+      if (includeEmptyValues || status.trim().isNotEmpty)
+        'status': status.trim(),
+
+      if (includeEmptyValues || priority.trim().isNotEmpty)
+        'priority': priority.trim(),
+
+      if (dueDate != null)
+        'due_date': _frappeDate(dueDate!),
+
+      if (includeEmptyValues || assignedTo.trim().isNotEmpty)
+        'assigned_to': assignedTo.trim(),
+    };
+  }
+
+  LeadTaskModel copyWith({
+    String? name,
+    String? leadId,
+    String? subject,
+    String? description,
+    String? status,
+    String? priority,
+    DateTime? dueDate,
+    String? assignedTo,
+    String? assignedBy,
+    String? owner,
+    DateTime? creation,
+    DateTime? modified,
+  }) {
+    return LeadTaskModel(
+      name: name ?? this.name,
+      leadId: leadId ?? this.leadId,
+      subject: subject ?? this.subject,
+      description: description ?? this.description,
+      status: status ?? this.status,
+      priority: priority ?? this.priority,
+      dueDate: dueDate ?? this.dueDate,
+      assignedTo: assignedTo ?? this.assignedTo,
+      assignedBy: assignedBy ?? this.assignedBy,
+      owner: owner ?? this.owner,
+      creation: creation ?? this.creation,
+      modified: modified ?? this.modified,
+    );
+  }
+
+  bool get isCompleted =>
+      status.trim().toLowerCase() == 'closed';
+
+  bool get isCancelled =>
+      status.trim().toLowerCase() == 'cancelled';
+
+  bool get isOverdue {
+    if (dueDate == null || isCompleted || isCancelled) {
+      return false;
+    }
+
+    final today = DateTime.now();
+    final currentDate = DateTime(
+      today.year,
+      today.month,
+      today.day,
+    );
+
+    final taskDate = DateTime(
+      dueDate!.year,
+      dueDate!.month,
+      dueDate!.day,
+    );
+
+    return taskDate.isBefore(currentDate);
+  }
+}
+
 class LeadMasterDataModel {
   final List<String> territories;
   final List<String> sources;
   final List<String> statuses;
   final List<String> eventCategories;
+  final List<String> taskStatuses;
+  final List<String> taskPriorities;
+  final List<LeadTaskAssigneeModel> taskAssignees;
 
   const LeadMasterDataModel({
     this.territories = const [],
     this.sources = const [],
     this.statuses = const [],
     this.eventCategories = const [],
+    this.taskStatuses = const [],
+    this.taskPriorities = const [],
+    this.taskAssignees = const [],
   });
 
   factory LeadMasterDataModel.fromJson(Map<String, dynamic> json) {
@@ -211,7 +418,16 @@ class LeadMasterDataModel {
       sources: _stringList(json['source']),
       statuses: _stringList(json['status']),
       eventCategories: _stringList(json['event_categories']),
-
+      taskStatuses: _stringList(json['task_statuses']),
+      taskPriorities: _stringList(json['task_priorities']),
+      taskAssignees: _mapList(json['task_assignees'])
+          .map(LeadTaskAssigneeModel.fromJson)
+          .where(
+            (employee) =>
+        employee.employee.isNotEmpty &&
+            employee.userId.isNotEmpty,
+      )
+          .toList(growable: false),
     );
   }
 }
@@ -261,6 +477,34 @@ class LeadEventListModel {
   }
 }
 
+class LeadTaskListModel {
+  final String leadId;
+  final List<LeadTaskModel> tasks;
+
+  const LeadTaskListModel({
+    required this.leadId,
+    this.tasks = const [],
+  });
+
+  factory LeadTaskListModel.fromJson(
+      Map<String, dynamic> json,
+      ) {
+    final leadId = _string(json['lead_id']);
+
+    return LeadTaskListModel(
+      leadId: leadId,
+      tasks: _mapList(json['tasks'])
+          .map(
+            (item) => LeadTaskModel.fromJson({
+          ...item,
+          'lead_id': leadId,
+        }),
+      )
+          .toList(growable: false),
+    );
+  }
+}
+
 class LeadMutationResultModel {
   final String message;
   final String leadId;
@@ -288,6 +532,22 @@ class LeadEventMutationResultModel {
     required this.leadId,
     required this.company,
     required this.event,
+  });
+}
+
+class LeadTaskMutationResultModel {
+  final String message;
+  final String taskId;
+  final String leadId;
+  final String company;
+  final LeadTaskModel task;
+
+  const LeadTaskMutationResultModel({
+    required this.message,
+    required this.taskId,
+    required this.leadId,
+    required this.company,
+    required this.task,
   });
 }
 
@@ -342,4 +602,12 @@ String _frappeDateTime(DateTime value) {
   return '${value.year.toString().padLeft(4, '0')}-'
       '${two(value.month)}-${two(value.day)} '
       '${two(value.hour)}:${two(value.minute)}:${two(value.second)}';
+}
+
+String _frappeDate(DateTime value) {
+  String two(int number) =>
+      number.toString().padLeft(2, '0');
+
+  return '${value.year.toString().padLeft(4, '0')}-'
+      '${two(value.month)}-${two(value.day)}';
 }

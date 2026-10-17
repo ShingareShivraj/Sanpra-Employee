@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../services/secure_storage_service.dart';
 import '../action_needed/actions_needed_screen.dart';
 import '../attendance/attendance_page.dart';
+import '../calling/customer_call_screen.dart';
 import '../chat/chat_screen.dart';
 import '../chat/manager/chat_manager_screen.dart';
 import '../issues/company_issues_screen.dart';
@@ -29,6 +30,8 @@ import 'dashboard_viewmodel.dart';
 import '../../model/my_work_model.dart';
 import '../work/my_work_screen.dart';
 import '../meeting/meeting_screen.dart';
+import '../calling/customer_search_screen.dart';
+import '../calling/customer_call_viewmodel.dart';
 
 const kBluePrimary = Color(0xFF1B5FE0);
 const kBlueAccent = Color(0xFF4E8CFF);
@@ -49,6 +52,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _isLeaveApprover = false;
   bool _canAccessMobileIssue = false;
   bool _canAccessMobileLead = false;
+  bool _canAccessMobileCaller = false;
   int _selectedTab = 0;
   Timer? _workTimer;
   Duration _workedDuration = Duration.zero;
@@ -142,6 +146,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       // Leads access
       _canAccessMobileLead = roles.contains('Mobile Lead');
+      _canAccessMobileCaller = roles.contains('Mobile Caller');
     });
   }
 
@@ -780,6 +785,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
             context,
             MaterialPageRoute(
               builder: (_) => const ListLeadScreen(),
+            ),
+          ),
+        ),
+
+
+      if (_canAccessMobileCaller)
+        _DashboardAction(
+          icon: Icons.phone_in_talk_rounded,
+          label: 'Customer Calls',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const CustomerCallScreen(),
             ),
           ),
         ),
